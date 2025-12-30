@@ -1,6 +1,6 @@
 // --- 1. CONFIGURAÇÕES E VARIÁVEIS GLOBAIS ---
-// Substitua pela sua Chave Pública (Public Key) do Mercado Pago
-const API_URL = "https://blackjack-matheus-oficial.onrender.com/";
+// Removi a barra "/" do final para evitar links como "//login"
+const API_URL = "https://blackjack-matheus-oficial.onrender.com";
 const mp = new MercadoPago('APP_USR-200fec89-34ca-4a32-b5af-9293167ab200'); 
 
 let baralho = [];
@@ -33,7 +33,6 @@ window.onload = function() {
     document.getElementById("stand-button").onclick = parar;
     document.getElementById("reset-button").onclick = iniciarRodadaComAposta;
     
-    // Botões de jogo começam escondidos
     document.getElementById("hit-button").classList.add("escondido");
     document.getElementById("stand-button").classList.add("escondido");
 };
@@ -51,7 +50,8 @@ async function fazerLogin() {
     const corpo = modoCadastro ? { email, senha, nome } : { email, senha };
 
     try {
-        const resposta = await fetch(`API_URL${rota}`, {
+        // CORREÇÃO: Usando a variável API_URL corretamente com crases (template strings)
+        const resposta = await fetch(`${API_URL}${rota}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(corpo)
@@ -64,7 +64,6 @@ async function fazerLogin() {
             alert("Conta criada! Clique em entrar.");
             toggleLogin();
         } else {
-            // CORREÇÃO: Salvando os dados retornados corretamente
             usuarioLogado = dados;
             localStorage.setItem("usuario_blackjack", JSON.stringify(dados));
             saldoReal = dados.saldo;
@@ -72,7 +71,10 @@ async function fazerLogin() {
             document.getElementById("login-screen").style.display = "none";
             atualizarHeaderUsuario();
         }
-    } catch (err) { alert("Erro ao conectar ao servidor."); }
+    } catch (err) { 
+        console.error(err);
+        alert("Erro ao conectar ao servidor. Tente atualizar a página em 1 minuto."); 
+    }
 }
 
 function toggleLogin() {
@@ -119,7 +121,6 @@ function atualizarInterfaceDinheiro() {
 
 function iniciarRodadaComAposta() {
     if (apostaAtual <= 0) return alert("Aposte fichas primeiro!");
-    
     pontosJogador = 0; pontosDealer = 0; asesJogador = 0; asesDealer = 0;
     cartaOcultaObjeto = null; jogoEmAndamento = true;
 
@@ -248,7 +249,8 @@ function limparMesa() {
 async function sincronizarSaldoComBanco() {
     if (!usuarioLogado) return;
     try {
-        await fetch('API_URL/atualizar-saldo', {
+        // CORREÇÃO: Usando a variável API_URL corretamente
+        await fetch(`${API_URL}/atualizar-saldo`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: usuarioLogado.email, novoSaldo: saldoReal })
@@ -273,7 +275,8 @@ async function solicitarPix() {
     const valor = document.getElementById("pix-valor").value;
     if (!valor || valor <= 0) return alert("Digite um valor válido!");
     try {
-        const resposta = await fetch('API_URL/gerar-pix', {
+        // CORREÇÃO: Usando a variável API_URL corretamente
+        const resposta = await fetch(`${API_URL}/gerar-pix`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ valor: valor, email: usuarioLogado.email, nome: usuarioLogado.nome })
@@ -297,29 +300,23 @@ async function gerarFormularioCartao() {
         callbacks: {
             onReady: () => { console.log("Formulário Pronto"); },
             onError: (err) => { console.error(err); alert("Erro ao carregar cartão."); },
-            onSubmit: (cardFormData) => {
+            onSubmit: (formData) => {
                 return new Promise((resolve, reject) => {
-                    fetch("API_URL/processar-cartao", {
+                    // CORREÇÃO: Usando a variável API_URL corretamente
+                    fetch(`${API_URL}/processar-cartao`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(cardFormData),
+                        body: JSON.stringify(formData),
                     })
                     .then(res => res.json())
                     .then(dados => {
                         if (dados.status === "approved") {
-                            // ATUALIZAÇÃO EM TEMPO REAL
                             saldoReal = dados.novoSaldo;
                             usuarioLogado.saldo = dados.novoSaldo;
                             localStorage.setItem("usuario_blackjack", JSON.stringify(usuarioLogado));
                             document.getElementById("balance").innerText = saldoReal;
-
-                            alert("Pagamento Aprovado! Fichas adicionadas.");
-                            fecharModalPix();
-                            resolve();
-                        } else {
-                            alert("Pagamento Recusado.");
-                            reject();
-                        }
+                            alert("Sucesso!"); fecharModalPix(); resolve();
+                        } else { alert("Recusado."); reject(); }
                     })
                     .catch(() => { alert("Erro no processamento."); reject(); });
                 });
