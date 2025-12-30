@@ -74,7 +74,7 @@ app.post('/atualizar-saldo', async (req, res) => {
     }
 });
 
-// --- ROTA GERAR PIX (REVISADA PARA PRODUÇÃO) ---
+// --- ROTA GERAR PIX (AJUSTADA PARA MÁXIMA ESTABILIDADE) ---
 app.post('/gerar-pix', async (req, res) => {
     try {
         const { valor, email, nome } = req.body;
@@ -82,10 +82,12 @@ app.post('/gerar-pix', async (req, res) => {
         const paymentData = {
             body: {
                 transaction_amount: Number(valor),
-                description: 'Deposito de Fichas - Blackjack',
+                description: `Recarga Blackjack - ${email}`,
                 payment_method_id: 'pix',
-                external_reference: email, // Identificador vital para o Webhook
-                notification_url: "https://www.primetcg.com.br/webhook", // URL oficial
+                // ETIQUETA: Salva o e-mail do jogo dentro do PIX
+                external_reference: email, 
+                // Usamos o link DIRETO do Render para evitar erro 307 de redirecionamento
+                notification_url: "https://blackjack-matheus-oficial.onrender.com/webhook",
                 payer: {
                     email: email,
                     first_name: nome || 'Jogador',
@@ -94,9 +96,8 @@ app.post('/gerar-pix', async (req, res) => {
                 additional_info: {
                     items: [
                         {
-                            id: 'fichas-blackjack-01',
-                            title: 'Fichas Virtuais Blackjack',
-                            description: 'Crédito de fichas para jogo',
+                            id: 'fichas-blackjack',
+                            title: 'Fichas Blackjack',
                             category_id: 'virtual_goods',
                             quantity: 1,
                             unit_price: Number(valor)
@@ -107,14 +108,59 @@ app.post('/gerar-pix', async (req, res) => {
         };
 
         const result = await payment.create(paymentData);
+        
+        console.log(`✅ PIX Gerado para: ${email} (ID: ${result.id})`);
+
         res.json({
             id: result.id,
             copia_e_cola: result.point_of_interaction.transaction_data.qr_code,
             imagem_qr: result.point_of_interaction.transaction_data.qr_code_base64
         });
     } catch (error) {
-        console.error("Erro PIX:", error);
+        console.error("❌ Erro ao gerar PIX:", error);
         res.status(500).json({ erro: "Erro ao gerar PIX" });
+    }
+});
+
+// --- ROTA WEBHOOK (O ÚNICO QUE SALVA NO BANCO DE DADOS) ---
+app.post('/webhook', async (req, res) => {
+    try {
+        // Captura o ID do pagamento enviado pelo Mercado Pago
+        const paymentId = req.query['data.id'] || req.query.id || (req.body.data && req.body.data.id);
+
+        console.log("🔔 Webhook recebeu notificação do ID:", paymentId);
+
+        if (paymentId && paymentId !== '123456') {
+            const pagamento = await payment.get({ id: paymentId });
+
+            // SÓ SALVA SE O STATUS FOR APROVADO
+            if (pagamento.status === 'approved') {
+                const valorPago = pagamento.transaction_amount;
+                
+                // PEGA O E-MAIL DA ETIQUETA (external_reference)
+                // Isso ignora o e-mail do banco e usa o e-mail que o usuário logou no seu site
+                const emailUsuarioNoJogo = pagamento.external_reference;
+
+                console.log(`💰 PAGAMENTO CONFIRMADO: R$ ${valorPago} para ${emailUsuarioNoJogo}`);
+
+                // ATUALIZAÇÃO NO MONGODB
+                const usuario = await Usuario.findOneAndUpdate(
+                    { email: emailUsuarioNoJogo },
+                    { $inc: { saldo: valorPago } }, // Soma o valor ao saldo atual
+                    { new: true }
+                );
+
+                if (usuario) {
+                    console.log(`✅ SALDO ATUALIZADO NO BANCO: Novo saldo de ${usuario.nome} é R$ ${usuario.saldo}`);
+                } else {
+                    console.log(`❌ ERRO: Usuário ${emailUsuarioNoJogo} não existe no banco de dados.`);
+                }
+            }
+        }
+        res.sendStatus(200); // Responde OK para o Mercado Pago
+    } catch (error) {
+        console.error("❌ ERRO NO WEBHOOK:", error.message);
+        res.sendStatus(200); 
     }
 });
 
