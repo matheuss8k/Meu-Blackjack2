@@ -19,21 +19,39 @@ const valores = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A
 
 // --- 2. INICIALIZAÇÃO E SESSÃO ---
 
-window.onload = function() {
+window.onload = async function() {
     const usuarioSessao = localStorage.getItem("usuario_blackjack");
+
     if (usuarioSessao) {
         usuarioLogado = JSON.parse(usuarioSessao);
-        saldoReal = usuarioLogado.saldo;
+        
+        // --- NOVIDADE: Busca o saldo FRESCO do banco de dados ao abrir o site ---
+        try {
+            const resposta = await fetch(`${API_URL}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: usuarioLogado.email, senha: "---" }) // Nossa flag de consulta
+            });
+            const dadosAtualizados = await resposta.json();
+            
+            // Atualiza a memória e a tela com a verdade do Banco de Dados
+            saldoReal = dadosAtualizados.saldo;
+            usuarioLogado.saldo = saldoReal;
+            localStorage.setItem("usuario_blackjack", JSON.stringify(usuarioLogado));
+        } catch (e) {
+            console.log("Erro ao sincronizar com o banco, usando saldo local.");
+            saldoReal = usuarioLogado.saldo;
+        }
+
         document.getElementById("login-screen").style.display = "none";
         document.getElementById("balance").innerText = saldoReal;
         atualizarHeaderUsuario(); 
     }
-    
+
     document.getElementById("hit-button").onclick = pedirCarta;
     document.getElementById("stand-button").onclick = parar;
     document.getElementById("reset-button").onclick = iniciarRodadaComAposta;
     
-    // Botões de jogo começam escondidos
     document.getElementById("hit-button").classList.add("escondido");
     document.getElementById("stand-button").classList.add("escondido");
 };
@@ -360,29 +378,29 @@ function iniciarVigiaPix(idPagamento) {
             if (dados.status === 'approved') {
                 clearInterval(intervalovigiaPix);
                 
-                // Em vez de somar na mão, vamos esperar 2 segundos pro Webhook salvar 
-                // e então pedir o saldo oficial do banco
-                setTimeout(async () => {
-                    // Atualiza os dados do usuário logado pegando o que está no banco agora
-                    const resLogin = await fetch(`${API_URL}/login`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: usuarioLogado.email, senha: "..." }) 
-                        // Dica: Se quiser ser mais rápido, pode manter o saldoReal += dados.valor, 
-                        // mas a etiqueta external_reference no server.js é o que garante que o BD salve.
-                    });
-                    
-                    // Lógica simplificada:
-                    saldoReal += Number(dados.valor);
-                    usuarioLogado.saldo = saldoReal;
-                    localStorage.setItem("usuario_blackjack", JSON.stringify(usuarioLogado));
-                    document.getElementById("balance").innerText = saldoReal;
+                // --- AJUSTE PARA NÃO DOBRAR ---
+                // Em vez de somar saldoReal += dados.valor, 
+                // vamos pedir para o servidor o saldo REAL que está no MongoDB agora.
+                const resUser = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        email: usuarioLogado.email, 
+                        senha: "---" // Enviaremos uma flag para o servidor saber que é só uma atualização
+                    })
+                });
+                const usuarioAtualizado = await resUser.json();
 
-                    fecharModalPix();
-                    alert("✨ DINHEIRO RECEBIDO! R$ " + dados.valor + " adicionados à sua conta oficial.");
-                }, 2000);
+                // Atualiza a tela e a memória com o valor OFICIAL do banco
+                saldoReal = usuarioAtualizado.saldo;
+                usuarioLogado.saldo = saldoReal;
+                localStorage.setItem("usuario_blackjack", JSON.stringify(usuarioLogado));
+                document.getElementById("balance").innerText = saldoReal;
+
+                fecharModalPix();
+                alert("✅ Depósito confirmado! Saldo atualizado.");
             }
-        } catch (e) { console.log("Processando..."); }
+        } catch (e) { console.log("Aguardando aprovação..."); }
     }, 3000); 
 }
 

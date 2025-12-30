@@ -55,6 +55,11 @@ app.post('/login', async (req, res) => {
         const usuario = await Usuario.findOne({ email });
         if (!usuario) return res.status(400).json({ erro: "Usuário não encontrado." });
 
+        // Se a senha for a "flag" de consulta, apenas retorna o usuário
+        if (senha === "---") {
+            return res.json(usuario);
+        }
+
         const senhaValida = await bcrypt.compare(senha, usuario.senha);
         if (!senhaValida) return res.status(400).json({ erro: "Senha incorreta." });
 
