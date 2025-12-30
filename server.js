@@ -24,7 +24,8 @@ const UsuarioSchema = new mongoose.Schema({
     nome: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     senha: { type: String, required: true },
-    saldo: { type: Number, default: 0 }
+    saldo: { type: Number, default: 0 },
+    role: { type: String, default: "player" } // player ou admin
 });
 
 const Usuario = mongoose.model('Usuario', UsuarioSchema);
@@ -57,7 +58,7 @@ app.post('/login', async (req, res) => {
         const senhaValida = await bcrypt.compare(senha, usuario.senha);
         if (!senhaValida) return res.status(400).json({ erro: "Senha incorreta." });
 
-        res.json({ id: usuario._id, nome: usuario.nome, email: usuario.email, saldo: usuario.saldo });
+        res.json({ id: usuario._id, nome: usuario.nome, email: usuario.email, saldo: usuario.saldo, role: usuario.role });
     } catch (err) {
         res.status(500).json({ erro: "Erro ao fazer login." });
     }
@@ -73,7 +74,7 @@ app.post('/atualizar-saldo', async (req, res) => {
     }
 });
 
-// --- ROTA GERAR PIX ATUALIZADA (COM ETIQUETA) ---
+// --- ROTA GERAR PIX (REVISADA PARA PRODUÇÃO) ---
 app.post('/gerar-pix', async (req, res) => {
     try {
         const { valor, email, nome } = req.body;
@@ -83,11 +84,24 @@ app.post('/gerar-pix', async (req, res) => {
                 transaction_amount: Number(valor),
                 description: 'Deposito de Fichas - Blackjack',
                 payment_method_id: 'pix',
-                external_reference: email, // <--- AQUI ESTÁ A ETIQUETA (E-mail do usuário no site)
+                external_reference: email, // Identificador vital para o Webhook
+                notification_url: "https://www.primetcg.com.br/webhook", // URL oficial
                 payer: {
                     email: email,
                     first_name: nome || 'Jogador',
                     last_name: 'Cliente'
+                },
+                additional_info: {
+                    items: [
+                        {
+                            id: 'fichas-blackjack-01',
+                            title: 'Fichas Virtuais Blackjack',
+                            description: 'Crédito de fichas para jogo',
+                            category_id: 'virtual_goods',
+                            quantity: 1,
+                            unit_price: Number(valor)
+                        }
+                    ]
                 }
             },
         };
@@ -99,26 +113,23 @@ app.post('/gerar-pix', async (req, res) => {
             imagem_qr: result.point_of_interaction.transaction_data.qr_code_base64
         });
     } catch (error) {
+        console.error("Erro PIX:", error);
         res.status(500).json({ erro: "Erro ao gerar PIX" });
     }
 });
 
-// --- NOVA ROTA: O JOGO VAI USAR ISSO PARA PERGUNTAR "JÁ PAGOU?" ---
+// --- ROTA CONSULTA (USADA PELO VIGIA DO SCRIPT.JS) ---
 app.get('/consultar-pagamento/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const pagamento = await payment.get({ id: id });
-
-        res.json({ 
-            status: pagamento.status, 
-            valor: pagamento.transaction_amount 
-        });
+        res.json({ status: pagamento.status, valor: pagamento.transaction_amount });
     } catch (error) {
-        res.status(500).json({ erro: "Erro ao consultar pagamento" });
+        res.status(500).json({ erro: "Erro ao consultar banco" });
     }
 });
 
-// --- ROTA PARA PROCESSAR CARTÃO (ATUALIZADA COM DEVICE ID E METADADOS) ---
+// --- ROTA CARTÃO (REVISADA COM DEVICE ID) ---
 app.post('/processar-cartao', async (req, res) => {
     try {
         const { token, issuer_id, payment_method_id, transaction_amount, installments, payer, device_id } = req.body;
@@ -130,15 +141,15 @@ app.post('/processar-cartao', async (req, res) => {
                 payment_method_id,
                 transaction_amount: Number(transaction_amount),
                 installments: Number(installments),
-                description: 'Compra de Fichas - Blackjack',
+                description: 'Deposito de Fichas - Blackjack',
+                external_reference: payer.email,
+                notification_url: "https://www.primetcg.com.br/webhook",
                 payer: { email: payer.email },
-                // RESOLVE AS PENDÊNCIAS DE ITENS
                 additional_info: {
                     items: [
                         {
                             id: 'fichas-blackjack-01',
-                            title: 'Fichas Virtuais Blackjack',
-                            description: 'Crédito de fichas para jogo de Blackjack',
+                            title: 'Fichas Blackjack',
                             category_id: 'virtual_goods',
                             quantity: 1,
                             unit_price: Number(transaction_amount)
@@ -146,10 +157,7 @@ app.post('/processar-cartao', async (req, res) => {
                     ]
                 }
             },
-            // RESOLVE A AÇÃO OBRIGATÓRIA: IDENTIFICADOR DE DISPOSITIVO
-            headers: {
-                'X-Meli-Session-Id': device_id 
-            }
+            headers: { 'X-Meli-Session-Id': device_id }
         };
 
         const result = await payment.create(paymentData);
@@ -163,50 +171,48 @@ app.post('/processar-cartao', async (req, res) => {
             return res.json({ status: 'approved', novoSaldo: usuarioAtualizado.saldo });
         }
         res.json({ status: result.status, status_detail: result.status_detail });
-
     } catch (error) {
-        console.error("Erro no processamento de cartão:", error);
         res.status(500).json({ erro: error.message });
     }
 });
 
-// --- ROTA WEBHOOK ATUALIZADA (LENDO A ETIQUETA) ---
+// --- ROTA WEBHOOK (O CORAÇÃO DO RECEBIMENTO) ---
 app.post('/webhook', async (req, res) => {
     try {
         const paymentId = req.query['data.id'] || req.query.id || (req.body.data && req.body.data.id);
+        
+        console.log("🔔 WEBHOOK: Notificação recebida para o ID:", paymentId);
 
         if (paymentId && paymentId !== '123456') {
             const pagamento = await payment.get({ id: paymentId });
 
             if (pagamento.status === 'approved') {
                 const valorPago = pagamento.transaction_amount;
-                
-                // BUSCAMOS O E-MAIL PELA ETIQUETA QUE CRIAMOS (external_reference)
-                const emailDoUsuarioNoSite = pagamento.external_reference;
+                const emailUsuario = pagamento.external_reference; // Puxa o e-mail da etiqueta
 
-                console.log(`💰 PAGAMENTO APROVADO: R$ ${valorPago} para o usuário: ${emailDoUsuarioNoSite}`);
+                console.log(`💰 PAGAMENTO APROVADO: R$ ${valorPago} para ${emailUsuario}`);
 
                 const usuario = await Usuario.findOneAndUpdate(
-                    { email: emailDoUsuarioNoSite }, 
-                    { $inc: { saldo: valorPago } }, 
+                    { email: emailUsuario },
+                    { $inc: { saldo: valorPago } },
                     { new: true }
                 );
 
                 if (usuario) {
-                    console.log(`✅ BANCO ATUALIZADO: Novo saldo de ${usuario.nome}: R$ ${usuario.saldo}`);
+                    console.log(`✅ BANCO ATUALIZADO: Novo saldo de ${usuario.nome} é R$ ${usuario.saldo}`);
                 } else {
-                    console.log(`⚠️ ERRO: Usuário ${emailDoUsuarioNoSite} não encontrado no banco.`);
+                    console.log(`❌ ERRO: Usuário com e-mail ${emailUsuario} não encontrado no banco.`);
                 }
             }
         }
-        res.sendStatus(200);
-    } catch (error) {
-        console.error("Erro Webhook:", error.message);
         res.sendStatus(200); 
+    } catch (error) {
+        console.error("❌ ERRO NO WEBHOOK:", error.message);
+        res.sendStatus(200); // Responde 200 sempre para o MP parar de tentar
     }
 });
 
-app.get('/', (req, res) => res.send("Servidor Blackjack Ativo!"));
+app.get('/', (req, res) => res.send("Servidor Blackjack Online!"));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
