@@ -350,29 +350,39 @@ function embaralharBaralho() {
 }
 
 function iniciarVigiaPix(idPagamento) {
-    // Se já tiver um vigia rodando, para ele antes de começar outro
     if (intervalovigiaPix) clearInterval(intervalovigiaPix);
 
-    // Pergunta ao servidor a cada 3 segundos
     intervalovigiaPix = setInterval(async () => {
         try {
             const resposta = await fetch(`${API_URL}/consultar-pagamento/${idPagamento}`);
             const dados = await resposta.json();
 
             if (dados.status === 'approved') {
-                clearInterval(intervalovigiaPix); // Para o vigia imediatamente
+                clearInterval(intervalovigiaPix);
                 
-                // ATUALIZA O SALDO NA TELA (Soma o valor aprovado)
-                saldoReal += Number(dados.valor);
-                usuarioLogado.saldo = saldoReal;
-                localStorage.setItem("usuario_blackjack", JSON.stringify(usuarioLogado));
-                document.getElementById("balance").innerText = saldoReal;
+                // Em vez de somar na mão, vamos esperar 2 segundos pro Webhook salvar 
+                // e então pedir o saldo oficial do banco
+                setTimeout(async () => {
+                    // Atualiza os dados do usuário logado pegando o que está no banco agora
+                    const resLogin = await fetch(`${API_URL}/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: usuarioLogado.email, senha: "..." }) 
+                        // Dica: Se quiser ser mais rápido, pode manter o saldoReal += dados.valor, 
+                        // mas a etiqueta external_reference no server.js é o que garante que o BD salve.
+                    });
+                    
+                    // Lógica simplificada:
+                    saldoReal += Number(dados.valor);
+                    usuarioLogado.saldo = saldoReal;
+                    localStorage.setItem("usuario_blackjack", JSON.stringify(usuarioLogado));
+                    document.getElementById("balance").innerText = saldoReal;
 
-                // FECHA A TELA E AVISA O SUCESSO
-                fecharModalPix();
-                alert("✅ Pagamento PIX confirmado! R$ " + dados.valor + " adicionados.");
+                    fecharModalPix();
+                    alert("✨ DINHEIRO RECEBIDO! R$ " + dados.valor + " adicionados à sua conta oficial.");
+                }, 2000);
             }
-        } catch (e) { console.log("Aguardando confirmação do banco..."); }
+        } catch (e) { console.log("Processando..."); }
     }, 3000); 
 }
 

@@ -73,7 +73,7 @@ app.post('/atualizar-saldo', async (req, res) => {
     }
 });
 
-// --- ROTA PARA GERAR PIX (ATUALIZADA) ---
+// --- ROTA GERAR PIX ATUALIZADA (COM ETIQUETA) ---
 app.post('/gerar-pix', async (req, res) => {
     try {
         const { valor, email, nome } = req.body;
@@ -83,37 +83,22 @@ app.post('/gerar-pix', async (req, res) => {
                 transaction_amount: Number(valor),
                 description: 'Deposito de Fichas - Blackjack',
                 payment_method_id: 'pix',
+                external_reference: email, // <--- AQUI ESTÁ A ETIQUETA (E-mail do usuário no site)
                 payer: {
                     email: email,
                     first_name: nome || 'Jogador',
-                    last_name: 'Cliente' 
-                },
-                additional_info: {
-                    items: [
-                        {
-                            id: 'fichas-blackjack-01',
-                            title: 'Fichas Virtuais Blackjack',
-                            description: 'Crédito de fichas para jogo de Blackjack',
-                            category_id: 'virtual_goods', 
-                            quantity: 1,
-                            unit_price: Number(valor)
-                        }
-                    ]
+                    last_name: 'Cliente'
                 }
             },
         };
 
         const result = await payment.create(paymentData);
-
-        // AQUI ESTÁ O AJUSTE: Enviamos o ID do pagamento de volta para o jogo
         res.json({
-            id: result.id, 
+            id: result.id,
             copia_e_cola: result.point_of_interaction.transaction_data.qr_code,
             imagem_qr: result.point_of_interaction.transaction_data.qr_code_base64
         });
-
     } catch (error) {
-        console.error("Erro ao gerar PIX:", error);
         res.status(500).json({ erro: "Erro ao gerar PIX" });
     }
 });
@@ -185,21 +170,39 @@ app.post('/processar-cartao', async (req, res) => {
     }
 });
 
+// --- ROTA WEBHOOK ATUALIZADA (LENDO A ETIQUETA) ---
 app.post('/webhook', async (req, res) => {
     try {
         const paymentId = req.query['data.id'] || req.query.id || (req.body.data && req.body.data.id);
+
         if (paymentId && paymentId !== '123456') {
             const pagamento = await payment.get({ id: paymentId });
+
             if (pagamento.status === 'approved') {
-                await Usuario.findOneAndUpdate(
-                    { email: pagamento.payer.email },
-                    { $inc: { saldo: pagamento.transaction_amount } }
+                const valorPago = pagamento.transaction_amount;
+                
+                // BUSCAMOS O E-MAIL PELA ETIQUETA QUE CRIAMOS (external_reference)
+                const emailDoUsuarioNoSite = pagamento.external_reference;
+
+                console.log(`💰 PAGAMENTO APROVADO: R$ ${valorPago} para o usuário: ${emailDoUsuarioNoSite}`);
+
+                const usuario = await Usuario.findOneAndUpdate(
+                    { email: emailDoUsuarioNoSite }, 
+                    { $inc: { saldo: valorPago } }, 
+                    { new: true }
                 );
+
+                if (usuario) {
+                    console.log(`✅ BANCO ATUALIZADO: Novo saldo de ${usuario.nome}: R$ ${usuario.saldo}`);
+                } else {
+                    console.log(`⚠️ ERRO: Usuário ${emailDoUsuarioNoSite} não encontrado no banco.`);
+                }
             }
         }
         res.sendStatus(200);
     } catch (error) {
-        res.sendStatus(200);
+        console.error("Erro Webhook:", error.message);
+        res.sendStatus(200); 
     }
 });
 
