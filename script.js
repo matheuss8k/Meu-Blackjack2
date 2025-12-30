@@ -1,5 +1,6 @@
 // --- 1. CONFIGURAÇÕES E VARIÁVEIS GLOBAIS ---
 // Substitua pela sua Chave Pública (Public Key) do Mercado Pago
+const API_URL = "https://blackjack-matheus-oficial.onrender.com/";
 const mp = new MercadoPago('APP_USR-200fec89-34ca-4a32-b5af-9293167ab200'); 
 
 let baralho = [];
@@ -50,7 +51,7 @@ async function fazerLogin() {
     const corpo = modoCadastro ? { email, senha, nome } : { email, senha };
 
     try {
-        const resposta = await fetch(`http://localhost:3000${rota}`, {
+        const resposta = await fetch(`API_URL${rota}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(corpo)
@@ -247,7 +248,7 @@ function limparMesa() {
 async function sincronizarSaldoComBanco() {
     if (!usuarioLogado) return;
     try {
-        await fetch('http://localhost:3000/atualizar-saldo', {
+        await fetch('API_URL/atualizar-saldo', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: usuarioLogado.email, novoSaldo: saldoReal })
@@ -272,7 +273,7 @@ async function solicitarPix() {
     const valor = document.getElementById("pix-valor").value;
     if (!valor || valor <= 0) return alert("Digite um valor válido!");
     try {
-        const resposta = await fetch('http://localhost:3000/gerar-pix', {
+        const resposta = await fetch('API_URL/gerar-pix', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ valor: valor, email: usuarioLogado.email, nome: usuarioLogado.nome })
@@ -298,7 +299,7 @@ async function gerarFormularioCartao() {
             onError: (err) => { console.error(err); alert("Erro ao carregar cartão."); },
             onSubmit: (cardFormData) => {
                 return new Promise((resolve, reject) => {
-                    fetch("http://localhost:3000/processar-cartao", {
+                    fetch("API_URL/processar-cartao", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(cardFormData),
