@@ -19,7 +19,14 @@ mongoose.connect(process.env.MONGO_URI)
 const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
 const payment = new Payment(client);
 
-// --- MODELO DO USUÁRIO ---
+// --- 1. MODELO PARA EVITAR DUPLICIDADE (TRAVA DE SEGURANÇA) ---
+const PagamentoProcessadoSchema = new mongoose.Schema({
+    idMP: { type: String, unique: true, required: true },
+    data: { type: Date, default: Date.now }
+});
+const PagamentoProcessado = mongoose.model('PagamentoProcessado', PagamentoProcessadoSchema);
+
+// --- 2. MODELO DO USUÁRIO ---
 const UsuarioSchema = new mongoose.Schema({
     nome: { type: String, required: true },
     email: { type: String, required: true, unique: true },
@@ -27,7 +34,6 @@ const UsuarioSchema = new mongoose.Schema({
     saldo: { type: Number, default: 0 },
     role: { type: String, default: "player" } 
 });
-
 const Usuario = mongoose.model('Usuario', UsuarioSchema);
 
 // --- ROTAS DE AUTENTICAÇÃO ---
@@ -96,7 +102,7 @@ app.get('/consultar-pagamento/:id', async (req, res) => {
     } catch (error) { res.status(500).json({ erro: "Erro ao consultar" }); }
 });
 
-// --- ROTA PROCESSAR CARTÃO (SEM SOMA MANUAL PARA EVITAR DUPLICIDADE) ---
+// --- ROTA PROCESSAR CARTÃO ---
 app.post('/processar-cartao', async (req, res) => {
     try {
         const { token, issuer_id, payment_method_id, transaction_amount, installments, payer, device_id } = req.body;
@@ -106,7 +112,7 @@ app.post('/processar-cartao', async (req, res) => {
                 transaction_amount: Number(transaction_amount),
                 installments: Number(installments),
                 description: 'Fichas Blackjack',
-                external_reference: payer.email, // IMPORTANTE para o Webhook saber quem é
+                external_reference: payer.email, 
                 notification_url: "https://blackjack-matheus-oficial.onrender.com/webhook",
                 payer: { email: payer.email },
                 additional_info: {
@@ -116,35 +122,52 @@ app.post('/processar-cartao', async (req, res) => {
             headers: { 'X-Meli-Session-Id': device_id }
         };
         const result = await payment.create(paymentData);
-
-        // Retornamos apenas o status. O saldo será somado pelo Webhook automaticamente.
         res.json({ status: result.status, status_detail: result.status_detail });
     } catch (error) { res.status(500).json({ erro: error.message }); }
 });
 
-// --- ÚNICA ROTA WEBHOOK (O DONO DA VERDADE) ---
+// --- 3. WEBHOOK DEFINITIVO (COM TRAVA ANTI-DUPLICIDADE) ---
 app.post('/webhook', async (req, res) => {
     try {
         const paymentId = req.query['data.id'] || req.query.id || (req.body.data && req.body.data.id);
         
-        if (paymentId && paymentId !== '123456') {
-            const pagamento = await payment.get({ id: paymentId });
+        if (!paymentId || paymentId === '123456') return res.sendStatus(200);
 
-            if (pagamento.status === 'approved') {
-                const valorPago = pagamento.transaction_amount;
-                const emailUsuario = pagamento.external_reference;
+        console.log("🔔 WEBHOOK: Verificando ID", paymentId);
 
-                console.log(`💰 APROVADO: R$ ${valorPago} para ${emailUsuario}`);
+        // CHECAGEM DE DUPLICIDADE: Vê se esse ID já foi pago antes
+        const jaProcessado = await PagamentoProcessado.findOne({ idMP: paymentId });
+        if (jaProcessado) {
+            console.log(`🚫 Bloqueio: Pagamento ${paymentId} já foi creditado. Ignorando.`);
+            return res.sendStatus(200);
+        }
 
-                // SOMA NO BANCO APENAS AQUI
-                await Usuario.findOneAndUpdate(
-                    { email: emailUsuario },
-                    { $inc: { saldo: valorPago } }
-                );
+        const pagamento = await payment.get({ id: paymentId });
+
+        if (pagamento.status === 'approved') {
+            const valorPago = pagamento.transaction_amount;
+            const emailUsuario = pagamento.external_reference;
+
+            console.log(`💰 APROVADO: R$ ${valorPago} para ${emailUsuario}`);
+
+            // 1. Soma no banco de dados
+            const usuario = await Usuario.findOneAndUpdate(
+                { email: emailUsuario },
+                { $inc: { saldo: valorPago } },
+                { new: true }
+            );
+
+            if (usuario) {
+                // 2. Registra o ID para que ele nunca mais seja usado
+                await PagamentoProcessado.create({ idMP: paymentId });
+                console.log(`✅ Saldo salvo e ID ${paymentId} travado com sucesso.`);
             }
         }
         res.sendStatus(200); 
-    } catch (error) { res.sendStatus(200); }
+    } catch (error) { 
+        console.error("Erro Webhook:", error.message);
+        res.sendStatus(200); 
+    }
 });
 
 app.get('/', (req, res) => res.send("Servidor Blackjack Online!"));
