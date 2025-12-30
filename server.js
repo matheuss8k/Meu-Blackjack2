@@ -8,7 +8,7 @@ const { MercadoPagoConfig, Payment } = require('mercadopago');
 const app = express();
 app.use(express.json());
 app.use(cors());
-app.use(express.static(__dirname)); // Isso faz o servidor mostrar o seu index.html
+app.use(express.static(__dirname)); 
 
 // --- CONEXÃO COM O MONGODB ---
 mongoose.connect(process.env.MONGO_URI)
@@ -16,7 +16,6 @@ mongoose.connect(process.env.MONGO_URI)
     .catch(err => console.error("❌ Erro ao conectar ao banco:", err));
 
 // --- CONFIGURAÇÃO MERCADO PAGO ---
-// Certifique-se de que MP_ACCESS_TOKEN está no seu arquivo .env
 const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
 const payment = new Payment(client);
 
@@ -64,7 +63,6 @@ app.post('/login', async (req, res) => {
     }
 });
 
-// --- ROTA DE ATUALIZAÇÃO DE SALDO (USADA PELO JOGO) ---
 app.post('/atualizar-saldo', async (req, res) => {
     try {
         const { email, novoSaldo } = req.body;
@@ -75,7 +73,7 @@ app.post('/atualizar-saldo', async (req, res) => {
     }
 });
 
-// --- ROTA PARA GERAR PIX ---
+// --- ROTA PARA GERAR PIX (ATUALIZADA COM METADADOS) ---
 app.post('/gerar-pix', async (req, res) => {
     try {
         const { valor, email, nome } = req.body;
@@ -90,11 +88,23 @@ app.post('/gerar-pix', async (req, res) => {
                     first_name: nome || 'Jogador',
                     last_name: 'Cliente' 
                 },
+                // RESOLVE AS PENDÊNCIAS DE ITENS DO MERCADO PAGO
+                additional_info: {
+                    items: [
+                        {
+                            id: 'fichas-blackjack-01',
+                            title: 'Fichas Virtuais Blackjack',
+                            description: 'Crédito de fichas para jogo de Blackjack',
+                            category_id: 'virtual_goods', 
+                            quantity: 1,
+                            unit_price: Number(valor)
+                        }
+                    ]
+                }
             },
         };
 
         const result = await payment.create(paymentData);
-
         res.json({
             copia_e_cola: result.point_of_interaction.transaction_data.qr_code,
             imagem_qr: result.point_of_interaction.transaction_data.qr_code_base64
@@ -106,10 +116,10 @@ app.post('/gerar-pix', async (req, res) => {
     }
 });
 
-// --- ROTA PARA PROCESSAR CARTÃO DE CRÉDITO ---
+// --- ROTA PARA PROCESSAR CARTÃO (ATUALIZADA COM DEVICE ID E METADADOS) ---
 app.post('/processar-cartao', async (req, res) => {
     try {
-        const { token, issuer_id, payment_method_id, transaction_amount, installments, payer } = req.body;
+        const { token, issuer_id, payment_method_id, transaction_amount, installments, payer, device_id } = req.body;
 
         const paymentData = {
             body: {
@@ -120,64 +130,59 @@ app.post('/processar-cartao', async (req, res) => {
                 installments: Number(installments),
                 description: 'Compra de Fichas - Blackjack',
                 payer: { email: payer.email },
+                // RESOLVE AS PENDÊNCIAS DE ITENS
+                additional_info: {
+                    items: [
+                        {
+                            id: 'fichas-blackjack-01',
+                            title: 'Fichas Virtuais Blackjack',
+                            description: 'Crédito de fichas para jogo de Blackjack',
+                            category_id: 'virtual_goods',
+                            quantity: 1,
+                            unit_price: Number(transaction_amount)
+                        }
+                    ]
+                }
             },
+            // RESOLVE A AÇÃO OBRIGATÓRIA: IDENTIFICADOR DE DISPOSITIVO
+            headers: {
+                'X-Meli-Session-Id': device_id 
+            }
         };
 
         const result = await payment.create(paymentData);
 
         if (result.status === 'approved') {
-            // Atualiza e retorna o usuário ATUALIZADO
             const usuarioAtualizado = await Usuario.findOneAndUpdate(
                 { email: payer.email },
                 { $inc: { saldo: Number(transaction_amount) } },
-                { new: true } // Isso faz o MongoDB retornar o dado JÁ somado
+                { new: true }
             );
-
-            console.log(`💰 Saldo atualizado para ${payer.email}: R$ ${usuarioAtualizado.saldo}`);
-            
-            return res.json({ 
-                status: 'approved', 
-                novoSaldo: usuarioAtualizado.saldo 
-            });
+            return res.json({ status: 'approved', novoSaldo: usuarioAtualizado.saldo });
         }
-
-        res.json({ status: result.status });
+        res.json({ status: result.status, status_detail: result.status_detail });
 
     } catch (error) {
-        console.error("Erro no processamento:", error);
+        console.error("Erro no processamento de cartão:", error);
         res.status(500).json({ erro: error.message });
     }
 });
 
-// --- ROTA DE WEBHOOK (CONFIRMAÇÃO DE PAGAMENTOS EXTERNOS) ---
 app.post('/webhook', async (req, res) => {
     try {
-        // Tenta capturar o ID do pagamento de diferentes formas (versões da API do MP)
         const paymentId = req.query['data.id'] || req.query.id || (req.body.data && req.body.data.id);
-
-        if (paymentId && paymentId !== '123456') { // Ignora IDs de teste genéricos
-            console.log("🔔 Webhook: Processando pagamento ID:", paymentId);
-
+        if (paymentId && paymentId !== '123456') {
             const pagamento = await payment.get({ id: paymentId });
-
             if (pagamento.status === 'approved') {
-                const valorPago = pagamento.transaction_amount;
-                const emailUsuario = pagamento.payer.email;
-
-                console.log(`💰 Webhook aprovado: R$ ${valorPago} creditados para ${emailUsuario}`);
-
                 await Usuario.findOneAndUpdate(
-                    { email: emailUsuario },
-                    { $inc: { saldo: valorPago } }
+                    { email: pagamento.payer.email },
+                    { $inc: { saldo: pagamento.transaction_amount } }
                 );
             }
         }
-
-        res.sendStatus(200); // Responde OK para o Mercado Pago
-
+        res.sendStatus(200);
     } catch (error) {
-        console.error("Erro no Webhook:", error.message);
-        res.sendStatus(200); // Mesmo com erro, respondemos 200 para o MP não ficar tentando reenviar infinitamente
+        res.sendStatus(200);
     }
 });
 

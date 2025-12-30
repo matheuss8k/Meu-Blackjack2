@@ -1,5 +1,4 @@
 // --- 1. CONFIGURAÇÕES E VARIÁVEIS GLOBAIS ---
-// Removi a barra "/" do final para evitar links como "//login"
 const API_URL = "https://www.primetcg.com.br";
 const mp = new MercadoPago('APP_USR-200fec89-34ca-4a32-b5af-9293167ab200'); 
 
@@ -33,6 +32,7 @@ window.onload = function() {
     document.getElementById("stand-button").onclick = parar;
     document.getElementById("reset-button").onclick = iniciarRodadaComAposta;
     
+    // Botões de jogo começam escondidos
     document.getElementById("hit-button").classList.add("escondido");
     document.getElementById("stand-button").classList.add("escondido");
 };
@@ -50,7 +50,6 @@ async function fazerLogin() {
     const corpo = modoCadastro ? { email, senha, nome } : { email, senha };
 
     try {
-        // CORREÇÃO: Usando a variável API_URL corretamente com crases (template strings)
         const resposta = await fetch(`${API_URL}${rota}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -72,8 +71,7 @@ async function fazerLogin() {
             atualizarHeaderUsuario();
         }
     } catch (err) { 
-        console.error(err);
-        alert("Erro ao conectar ao servidor. Tente atualizar a página em 1 minuto."); 
+        alert("Erro ao conectar ao servidor. Tente atualizar a página."); 
     }
 }
 
@@ -249,7 +247,6 @@ function limparMesa() {
 async function sincronizarSaldoComBanco() {
     if (!usuarioLogado) return;
     try {
-        // CORREÇÃO: Usando a variável API_URL corretamente
         await fetch(`${API_URL}/atualizar-saldo`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -275,7 +272,6 @@ async function solicitarPix() {
     const valor = document.getElementById("pix-valor").value;
     if (!valor || valor <= 0) return alert("Digite um valor válido!");
     try {
-        // CORREÇÃO: Usando a variável API_URL corretamente
         const resposta = await fetch(`${API_URL}/gerar-pix`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -301,12 +297,17 @@ async function gerarFormularioCartao() {
             onReady: () => { console.log("Formulário Pronto"); },
             onError: (err) => { console.error(err); alert("Erro ao carregar cartão."); },
             onSubmit: (formData) => {
+                // CAPTURA O IDENTIFICADOR DO DISPOSITIVO (Ação obrigatória do MP)
+                const deviceId = mp.getDeviceSessionId();
+
                 return new Promise((resolve, reject) => {
-                    // CORREÇÃO: Usando a variável API_URL corretamente
                     fetch(`${API_URL}/processar-cartao`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(formData),
+                        body: JSON.stringify({
+                            ...formData,
+                            device_id: deviceId // Envia o ID capturado para o servidor
+                        }),
                     })
                     .then(res => res.json())
                     .then(dados => {
@@ -315,8 +316,13 @@ async function gerarFormularioCartao() {
                             usuarioLogado.saldo = dados.novoSaldo;
                             localStorage.setItem("usuario_blackjack", JSON.stringify(usuarioLogado));
                             document.getElementById("balance").innerText = saldoReal;
-                            alert("Sucesso!"); fecharModalPix(); resolve();
-                        } else { alert("Recusado."); reject(); }
+                            alert("Sucesso! Fichas adicionadas."); 
+                            fecharModalPix(); 
+                            resolve();
+                        } else { 
+                            alert("Recusado: " + (dados.status_detail || "Erro desconhecido")); 
+                            reject(); 
+                        }
                     })
                     .catch(() => { alert("Erro no processamento."); reject(); });
                 });
@@ -325,6 +331,7 @@ async function gerarFormularioCartao() {
     });
 }
 
+// Auxiliares
 function formatarPlacar(p, a) { return (a > 0 && p <= 21) ? `${p} / ${p - 10}` : p; }
 function criarBaralho() { baralho = []; naipes.forEach(n => valores.forEach(v => baralho.push(v + "-" + n))); }
 function embaralharBaralho() {
