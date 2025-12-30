@@ -25,7 +25,7 @@ const UsuarioSchema = new mongoose.Schema({
     nome: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     senha: { type: String, required: true },
-    saldo: { type: Number, default: 1000 }
+    saldo: { type: Number, default: 0 }
 });
 
 const Usuario = mongoose.model('Usuario', UsuarioSchema);
