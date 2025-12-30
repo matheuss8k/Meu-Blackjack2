@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blackjack Pro - Cassino Definitivo</title>
+    
+    <!-- Scripts Externos -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://sdk.mercadopago.com/js/v2"></script>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- 1. Cabeçalho do Usuário -->
+    <header id="user-header">
+        <div class="user-info">
+            <span class="user-icon">👤</span>
+            <span id="display-user-name">Jogador</span>
+        </div>
+        <div class="user-actions">
+            <button id="btn-deposit" onclick="abrirModalDeposito()">Depositar R$</button>
+            <button id="logout-button" onclick="logout()">Sair</button>
+        </div>
+    </header>
+
+    <!-- 2. Tela de Login (Fundo Preto Total) -->
+    <div id="login-screen" class="modal-overlay">
+        <div class="modal-content">
+            <h2 id="login-title">Entrar no Cassino</h2>
+            <input type="text" id="user-name" placeholder="Seu Nome (Para cadastro)" class="login-input" style="display:none;">
+            <input type="email" id="user-email" placeholder="E-mail" class="login-input">
+            <input type="password" id="user-pass" placeholder="Senha" class="login-input">
+            <button onclick="fazerLogin()" id="btn-login" class="btn-main-login">Entrar</button>
+            <p id="toggle-text" class="toggle-link" onclick="toggleLogin()">Não tem conta? Cadastre-se</p>
+        </div>
+    </div>
+
+    <!-- 3. Telas de Resultado (Overlays Transparentes) -->
+    <div id="victory-overlay" class="result-overlay">
+        <div class="result-content">
+            <h1 class="victory-title">✨ VOCÊ VENCEU! ✨</h1>
+            <button onclick="fecharCelebracao()" class="action-btn primary">Continuar</button>
+        </div>
+    </div>
+
+    <div id="defeat-overlay" class="result-overlay">
+        <div class="result-content">
+            <h1 class="defeat-title">A BANCA VENCEU</h1>
+            <button onclick="fecharDerrota()" class="action-btn">Tentar Novamente</button>
+        </div>
+    </div>
+
+    <div id="tie-overlay" class="result-overlay">
+        <div class="result-content">
+            <h1 class="tie-title">EMPATE</h1>
+            <button onclick="fecharTie()" class="action-btn">Recuperar Aposta</button>
+        </div>
+    </div>
+
+    <!-- 4. Elementos de Jogo -->
+    <h1>Blackjack</h1>
+    <div id="deck-visual"></div>
+
+    <div class="game-container">
+        <!-- Área do Dealer -->
+        <div id="dealer-area" class="game-section">
+            <div id="dealer-cards" class="cards-display"></div>
+            <p class="score-text">Dealer: <span id="dealer-score">0</span></p>
+        </div>
+
+        <!-- Área do Jogador -->
+        <div id="player-area" class="game-section">
+            <div id="player-cards" class="cards-display"></div>
+            <p class="score-text">Você: <span id="player-score">0</span></p>
+        </div>
+    </div>
+
+    <!-- 5. Rodapé (Apostas e Botões) -->
+    <div id="betting-and-controls">
+        <div id="money-area">
+            Saldo: R$ <span id="balance">0</span> | Aposta: R$ <span id="current-bet">0</span>
+        </div>
+
+        <div id="chips-area">
+            <button class="chip chip-10" onclick="apostar(10)">10</button>
+            <button class="chip chip-50" onclick="apostar(50)">50</button>
+            <button class="chip chip-100" onclick="apostar(100)">100</button>
+            <button id="clear-bet" onclick="limparAposta()">Limpar Aposta</button>
+        </div>
+
+        <div id="controls">
+            <button id="hit-button" class="action-btn">Pedir (Hit)</button>
+            <button id="stand-button" class="action-btn">Parar (Stand)</button>
+            <button id="reset-button" class="action-btn primary">Distribuir Cartas</button>
+        </div>
+    </div>
+
+    <!-- 6. Janela de Depósito (PIX e Cartão) -->
+    <div id="pix-modal" class="result-overlay">
+        <div class="modal-content" style="max-height: 90vh; overflow-y: auto; width: 350px;">
+            <h3>Depositar Fichas</h3>
+            
+            <div id="deposit-options">
+                <input type="number" id="pix-valor" placeholder="Valor R$ (ex: 10)" class="login-input">
+                <button onclick="gerarFormularioCartao()" class="btn-main-login" style="background: #2980b9; margin-bottom: 10px;">Pagar com Cartão</button>
+                <button onclick="solicitarPix()" class="btn-main-login">Gerar PIX</button>
+            </div>
+
+            <!-- Onde o formulário do cartão vai "nascer" -->
+            <div id="cardPaymentBrick_container"></div>
+
+            <!-- Resultado do PIX -->
+            <div id="pix-resultado" style="display:none; margin-top: 15px;">
+                <p>Escaneie o QR Code:</p>
+                <img id="pix-img" style="width: 180px; height: 180px; margin: 10px 0;">
+                <textarea id="pix-copia-cola" style="width: 100%; font-size: 10px; height: 40px;" readonly></textarea>
+                <p style="font-size: 11px; color: #666;">O saldo cai após o pagamento.</p>
+            </div>
+            
+            <button onclick="fecharModalPix()" class="toggle-link" style="border: none; background: none;">Cancelar</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

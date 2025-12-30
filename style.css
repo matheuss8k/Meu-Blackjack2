@@ -1,0 +1,216 @@
+/* --- CONFIGURAÇÕES GERAIS --- */
+:root {
+    --verde-cassino: #1a472a;
+    --verde-claro: #2c5e2e;
+    --dourado: #ffd700;
+}
+
+html, body {
+    height: 100vh;
+    margin: 0; padding: 0;
+    overflow: hidden;
+}
+
+body {
+    background-color: var(--verde-cassino);
+    background-image: radial-gradient(circle, var(--verde-claro) 0%, var(--verde-cassino) 100%);
+    color: white;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+h1 { font-size: 1.6rem; color: var(--dourado); margin: 5px 0; }
+
+/* --- CABEÇALHO --- */
+#user-header {
+    width: 100%; height: 45px;
+    display: none; justify-content: space-between; align-items: center;
+    background: rgba(0, 0, 0, 0.8); padding: 0 20px;
+    border-bottom: 1px solid var(--dourado); box-sizing: border-box;
+}
+
+#logout-button { background: none; border: 1px solid #e74c3c; color: #e74c3c; cursor: pointer; border-radius: 4px; padding: 2px 8px; }
+
+/* --- MESA CENTRAL --- */
+.game-container {
+    flex: 1; width: 100%;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center; gap: 5px;
+}
+
+.game-section {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 15px;
+    padding: 15px;
+    width: 90%;
+    max-width: 500px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    
+    /* ADICIONE ESTAS LINHAS ABAIXO */
+    min-height: 170px; /* Reserva espaço para as cartas + placar */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transition: none; /* Garante que não haja animação de tamanho */
+}
+
+.cards-display {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    
+    /* ADICIONE/AJUSTE ESTA LINHA */
+    height: 115px; /* Altura fixa igual à altura das cartas (110px) + um respiro */
+    align-items: center;
+}
+
+.score-text { font-size: 1rem; margin: 5px 0; font-weight: bold; }
+
+/* --- BARALHO E ANIMAÇÃO --- */
+#deck-visual {
+    /* TAMANHO EXATO DAS CARTAS DA MESA */
+    width: 75px;
+    height: 110px;
+    
+    background-color: #1a3a1b;
+    border: 2px solid white;
+    border-radius: 8px;
+    
+    /* POSICIONAMENTO CENTRALIZADO AJUSTADO */
+    position: fixed;
+    top: 45%;         /* Subimos de 50% para 45% para compensar o rodapé */
+    left: 50%;        
+    
+    /* 280px empurra para a direita da mesa. 
+       O -50% vertical garante que o centro do baralho fique no ponto 45% */
+    transform: translate(280px, -50%);
+    
+    background-image: repeating-linear-gradient(
+        45deg, 
+        #2c5e2e 0px, 
+        #2c5e2e 2px, 
+        #1a3a1b 2px, 
+        #1a3a1b 10px
+    );
+    
+    box-shadow: 
+        -2px 2px 0px white, 
+        -4px 4px 0px #1a3a1b, 
+        -6px 6px 0px white, 
+        -10px 10px 20px rgba(0,0,0,0.5);
+        
+    z-index: 100;
+}
+
+.card-container { width: 75px; height: 110px; position: relative; animation: dealCard 0.8s ease-out; }
+@keyframes dealCard {
+    0% { opacity: 0; transform: translate(300px, 0) rotate(45deg); }
+    100% { opacity: 1; transform: translate(0, 0) rotate(0deg); }
+}
+
+.card { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.6s; }
+.card.flipped { transform: rotateY(180deg); }
+
+/* --- CORREÇÃO DE ALINHAMENTO DAS FACES --- */
+.card-front, .card-back { 
+    position: absolute; 
+    width: 100%; height: 100%; 
+    backface-visibility: hidden; 
+    border-radius: 8px; 
+    display: flex; flex-direction: column; align-items: center; justify-content: center; 
+    font-weight: bold; font-size: 18px; 
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.3); 
+    
+    /* Garante tamanho idêntico com borda */
+    border: 2px solid white; 
+    box-sizing: border-box; 
+}
+
+.card-back { 
+    background-color: #1a3a1b; 
+    background-image: repeating-linear-gradient(45deg, #2c5e2e 0px, #2c5e2e 2px, #1a3a1b 2px, #1a3a1b 10px); 
+}
+
+.card-front { 
+    background: white; 
+    color: black; 
+    transform: rotateY(180deg); 
+    font-family: 'Courier New', monospace; 
+}
+
+.red .card-front { color: #e74c3c; }
+
+/* --- RODAPÉ E BOTÕES --- */
+#betting-and-controls {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 15px 0;
+    text-align: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    
+    /* ADICIONE ESTAS DUAS LINHAS PARA TRAVAR O RODAPÉ */
+    min-height: 180px; /* Altura suficiente para as fichas + botões */
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Centraliza o conteúdo dentro dessa altura fixa */
+}
+
+#money-area { font-weight: bold; color: var(--dourado); margin-bottom: 8px; }
+.chip { width: 55px; height: 55px; border-radius: 50%; border: 3px dashed white; cursor: pointer; margin: 0 5px; transition: 0.2s; }
+.chip:hover { transform: translateY(-3px); }
+.chip-10 { background: #c0392b; } .chip-50 { background: #2980b9; } .chip-100 { background: #2c3e50; }
+
+#clear-bet { background: rgba(255,255,255,0.1); border: 1px solid white; color: white; border-radius: 20px; padding: 4px 12px; cursor: pointer; font-size: 11px; display: block; margin: 8px auto; }
+#clear-bet:hover { background: #c0392b; }
+
+.action-btn { padding: 10px 20px; font-size: 0.9rem; margin: 5px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; }
+#reset-button.primary { background: var(--dourado); color: #222; padding: 10px 30px; }
+.action-btn:disabled { opacity: 0.5; }
+
+/* --- TELAS DE LOGIN E RESULTADO (OVERLAYS) --- */
+.modal-overlay, .result-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; justify-content: center; align-items: center; }
+.result-overlay { background: rgba(0,0,0,0.85); display: none; } 
+
+.modal-content { background: white; color: #222; padding: 30px; border-radius: 15px; width: 300px; text-align: center; }
+
+/* --- RESULTADOS TRANSPARENTES --- */
+.result-content { background: transparent; text-align: center; color: white; }
+
+.victory-title { color: var(--dourado); font-size: 4rem; text-shadow: 0 0 20px rgba(255, 215, 0, 0.7); margin-bottom: 20px; }
+.defeat-title { color: #ff4d4d; font-size: 3.5rem; text-shadow: 0 0 20px rgba(255, 77, 77, 0.5); margin-bottom: 20px; }
+.tie-title { color: #ffffff; font-size: 3.5rem; text-shadow: 0 0 15px rgba(255, 255, 255, 0.5); margin-bottom: 20px; }
+
+.login-input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+.btn-main-login { width: 100%; padding: 10px; background: var(--verde-cassino); color: white; border: none; font-weight: bold; cursor: pointer; border-radius: 6px; }
+
+.escondido { display: none !important; }
+
+/* Opcional: cria um contorno sutil onde as cartas vão aparecer */
+.cards-display:empty::before {
+    content: "Aguardando Apostas";
+    font-size: 12px;
+    opacity: 0.3;
+    border: 1px dashed rgba(255,255,255,0.2);
+    width: 75px;
+    height: 110px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+}
+
+#btn-deposit {
+    background: var(--dourado);
+    color: #111;
+    font-weight: bold;
+    border: none;
+    padding: 6px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-right: 10px;
+    transition: 0.3s;
+}
+#btn-deposit:hover { transform: scale(1.05); background: white; }
