@@ -1,5 +1,5 @@
 // --- 1. CONFIGURAÇÕES E VARIÁVEIS GLOBAIS ---
-const API_URL = "";
+const API_URL = ""; // Caminho relativo para funcionar em qualquer domínio
 const mp = new MercadoPago('APP_USR-200fec89-34ca-4a32-b5af-9293167ab200'); 
 
 let intervalovigiaPix = null;
@@ -17,7 +17,7 @@ let asesJogador = 0; asesDealer = 0;
 const naipes = ["C", "D", "H", "S"];
 const valores = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
 
-// --- 2. INICIALIZAÇÃO E SESSÃO ---
+// --- 2. INICIALIZAÇÃO E SESSÃO (SINCRONIA COM BD) ---
 
 window.onload = async function() {
     const usuarioSessao = localStorage.getItem("usuario_blackjack");
@@ -25,16 +25,15 @@ window.onload = async function() {
     if (usuarioSessao) {
         usuarioLogado = JSON.parse(usuarioSessao);
         
-        // --- NOVIDADE: Busca o saldo FRESCO do banco de dados ao abrir o site ---
+        // Busca o saldo REAL do banco de dados ao abrir o site para evitar bugs de memória local
         try {
             const resposta = await fetch(`${API_URL}/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: usuarioLogado.email, senha: "---" }) // Nossa flag de consulta
+                body: JSON.stringify({ email: usuarioLogado.email, senha: "---" }) 
             });
             const dadosAtualizados = await resposta.json();
             
-            // Atualiza a memória e a tela com a verdade do Banco de Dados
             saldoReal = dadosAtualizados.saldo;
             usuarioLogado.saldo = saldoReal;
             localStorage.setItem("usuario_blackjack", JSON.stringify(usuarioLogado));
@@ -89,9 +88,7 @@ async function fazerLogin() {
             document.getElementById("login-screen").style.display = "none";
             atualizarHeaderUsuario();
         }
-    } catch (err) { 
-        alert("Erro ao conectar ao servidor. Tente atualizar a página."); 
-    }
+    } catch (err) { alert("Erro ao conectar ao servidor."); }
 }
 
 function toggleLogin() {
@@ -99,7 +96,6 @@ function toggleLogin() {
     document.getElementById("login-title").innerText = modoCadastro ? "Criar Conta" : "Entrar no Cassino";
     document.getElementById("user-name").style.display = modoCadastro ? "block" : "none";
     document.getElementById("btn-login").innerText = modoCadastro ? "Cadastrar" : "Entrar";
-    document.getElementById("toggle-text").innerText = modoCadastro ? "Já tem conta? Entre aqui" : "Não tem conta? Cadastre-se";
 }
 
 function atualizarHeaderUsuario() {
@@ -111,7 +107,7 @@ function atualizarHeaderUsuario() {
 
 function logout() { localStorage.removeItem("usuario_blackjack"); location.reload(); }
 
-// --- 4. SISTEMA DE APOSTAS ---
+// --- 4. SISTEMA DE APOSTAS (COM SINCRONIZAÇÃO IMEDIATA) ---
 
 function apostar(valor) {
     if (jogoEmAndamento) return;
@@ -119,6 +115,9 @@ function apostar(valor) {
         saldoReal -= valor; 
         apostaAtual += valor;
         atualizarInterfaceDinheiro();
+        
+        // SALVA NO BANCO NA HORA: Retira o dinheiro da conta do jogador
+        sincronizarSaldoComBanco(); 
     } else { alert("Saldo insuficiente!"); }
 }
 
@@ -127,6 +126,9 @@ function limparAposta() {
     saldoReal += apostaAtual; 
     apostaAtual = 0;
     atualizarInterfaceDinheiro();
+    
+    // SALVA NO BANCO NA HORA: Devolve o dinheiro para a conta do jogador
+    sincronizarSaldoComBanco();
 }
 
 function atualizarInterfaceDinheiro() {
@@ -162,8 +164,8 @@ function iniciarRodadaComAposta() {
 function darCartaPara(quem) {
     if (baralho.length === 0) return;
     let carta = baralho.pop();
-    let valor = pegarValor(carta);
     let partes = carta.split("-");
+    let valor = pegarValor(carta);
     const simbolos = { "C": "♣", "D": "♦", "H": "♥", "S": "♠" };
 
     let container = document.createElement("div");
@@ -236,13 +238,21 @@ function finalizarRodada(res) {
     document.getElementById("chips-area").classList.remove("escondido");
     document.getElementById("reset-button").classList.remove("escondido");
 
-    if (res === "ganhou") { dispararCelebracao(); saldoReal += apostaAtual * 2; }
-    else if (res === "empate") { document.getElementById("tie-overlay").style.display = "flex"; saldoReal += apostaAtual; }
-    else { document.getElementById("defeat-overlay").style.display = "flex"; }
+    if (res === "ganhou") { 
+        dispararCelebracao(); 
+        saldoReal += apostaAtual * 2; 
+    }
+    else if (res === "empate") { 
+        document.getElementById("tie-overlay").style.display = "flex"; 
+        saldoReal += apostaAtual; 
+    }
+    else { 
+        document.getElementById("defeat-overlay").style.display = "flex"; 
+    }
 
     apostaAtual = 0; 
     atualizarInterfaceDinheiro(); 
-    sincronizarSaldoComBanco();
+    sincronizarSaldoComBanco(); // Salva o prêmio ou confirma a perda
 }
 
 // --- 6. COMEMORAÇÕES E LIMPEZA ---
@@ -285,12 +295,14 @@ function abrirModalDeposito() {
     document.getElementById("cardPaymentBrick_container").innerHTML = ""; 
 }
 
-function fecharModalPix() { document.getElementById("pix-modal").style.display = "none"; }
+function fecharModalPix() { 
+    document.getElementById("pix-modal").style.display = "none"; 
+    if (intervalovigiaPix) clearInterval(intervalovigiaPix);
+}
 
 async function solicitarPix() {
     const valor = document.getElementById("pix-valor").value;
     if (!valor || valor <= 0) return alert("Digite um valor válido!");
-
     try {
         const resposta = await fetch(`${API_URL}/gerar-pix`, {
             method: 'POST',
@@ -298,66 +310,73 @@ async function solicitarPix() {
             body: JSON.stringify({ valor: valor, email: usuarioLogado.email, nome: usuarioLogado.nome })
         });
         const dados = await resposta.json();
-
-        // Mostra o QR Code
         document.getElementById("pix-img").src = `data:image/jpeg;base64,${dados.imagem_qr}`;
         document.getElementById("pix-copia-cola").value = dados.copia_e_cola;
         document.getElementById("pix-resultado").style.display = "block";
-
-        // --- INICIA O VIGIA AQUI ---
         iniciarVigiaPix(dados.id);
-
     } catch (err) { alert("Erro ao gerar PIX."); }
 }
 
 async function gerarFormularioCartao() {
     const valor = document.getElementById("pix-valor").value;
     if (!valor || valor <= 0) return alert("Digite um valor válido!");
-
     document.getElementById("deposit-options").style.display = "none";
     const bricksBuilder = mp.bricks();
-    
     window.cardPaymentBrickController = await bricksBuilder.create('cardPayment', 'cardPaymentBrick_container', {
         initialization: { amount: Number(valor), payer: { email: usuarioLogado.email } },
         callbacks: {
-            onReady: () => { console.log("Formulário Pronto"); },
-            onError: (err) => { console.error(err); alert("Erro ao carregar cartão."); },
+            onReady: () => { console.log("Pronto"); },
+            onError: (err) => { console.error(err); },
             onSubmit: (formData) => {
-                // CAPTURA O IDENTIFICADOR DO DISPOSITIVO (Ação obrigatória do MP)
                 const deviceId = mp.getDeviceSessionId();
-
                 return new Promise((resolve, reject) => {
                     fetch(`${API_URL}/processar-cartao`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            ...formData,
-                            device_id: deviceId // Envia o ID capturado para o servidor
-                        }),
+                        body: JSON.stringify({ ...formData, device_id: deviceId }),
                     })
                     .then(res => res.json())
                     .then(dados => {
                         if (dados.status === "approved") {
                             saldoReal = dados.novoSaldo;
-                            usuarioLogado.saldo = dados.novoSaldo;
+                            usuarioLogado.saldo = saldoReal;
                             localStorage.setItem("usuario_blackjack", JSON.stringify(usuarioLogado));
                             document.getElementById("balance").innerText = saldoReal;
-                            alert("Sucesso! Fichas adicionadas."); 
-                            fecharModalPix(); 
-                            resolve();
-                        } else { 
-                            alert("Recusado: " + (dados.status_detail || "Erro desconhecido")); 
-                            reject(); 
-                        }
+                            alert("Sucesso!"); fecharModalPix(); resolve();
+                        } else { alert("Recusado."); reject(); }
                     })
-                    .catch(() => { alert("Erro no processamento."); reject(); });
+                    .catch(() => { alert("Erro servidor."); reject(); });
                 });
             }
         }
     });
 }
 
-// Auxiliares
+function iniciarVigiaPix(idPagamento) {
+    if (intervalovigiaPix) clearInterval(intervalovigiaPix);
+    intervalovigiaPix = setInterval(async () => {
+        try {
+            const resposta = await fetch(`${API_URL}/consultar-pagamento/${idPagamento}`);
+            const dados = await resposta.json();
+            if (dados.status === 'approved') {
+                clearInterval(intervalovigiaPix);
+                const resUser = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: usuarioLogado.email, senha: "---" })
+                });
+                const usuarioAtualizado = await resUser.json();
+                saldoReal = usuarioAtualizado.saldo;
+                usuarioLogado.saldo = saldoReal;
+                localStorage.setItem("usuario_blackjack", JSON.stringify(usuarioLogado));
+                document.getElementById("balance").innerText = saldoReal;
+                fecharModalPix();
+                alert("✅ Depósito confirmado!");
+            }
+        } catch (e) {}
+    }, 3000); 
+}
+
 function formatarPlacar(p, a) { return (a > 0 && p <= 21) ? `${p} / ${p - 10}` : p; }
 function criarBaralho() { baralho = []; naipes.forEach(n => valores.forEach(v => baralho.push(v + "-" + n))); }
 function embaralharBaralho() {
@@ -365,47 +384,4 @@ function embaralharBaralho() {
         let j = Math.floor(Math.random() * (i + 1));
         [baralho[i], baralho[j]] = [baralho[j], baralho[i]];
     }
-}
-
-function iniciarVigiaPix(idPagamento) {
-    if (intervalovigiaPix) clearInterval(intervalovigiaPix);
-
-    intervalovigiaPix = setInterval(async () => {
-        try {
-            const resposta = await fetch(`${API_URL}/consultar-pagamento/${idPagamento}`);
-            const dados = await resposta.json();
-
-            if (dados.status === 'approved') {
-                clearInterval(intervalovigiaPix);
-                
-                // --- AJUSTE PARA NÃO DOBRAR ---
-                // Em vez de somar saldoReal += dados.valor, 
-                // vamos pedir para o servidor o saldo REAL que está no MongoDB agora.
-                const resUser = await fetch(`${API_URL}/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        email: usuarioLogado.email, 
-                        senha: "---" // Enviaremos uma flag para o servidor saber que é só uma atualização
-                    })
-                });
-                const usuarioAtualizado = await resUser.json();
-
-                // Atualiza a tela e a memória com o valor OFICIAL do banco
-                saldoReal = usuarioAtualizado.saldo;
-                usuarioLogado.saldo = saldoReal;
-                localStorage.setItem("usuario_blackjack", JSON.stringify(usuarioLogado));
-                document.getElementById("balance").innerText = saldoReal;
-
-                fecharModalPix();
-                alert("✅ Depósito confirmado! Saldo atualizado.");
-            }
-        } catch (e) { console.log("Aguardando aprovação..."); }
-    }, 3000); 
-}
-
-// Ajuste a fecharModalPix para parar o vigia se o usuário desistir e fechar
-function fecharModalPix() {
-    document.getElementById("pix-modal").style.display = "none";
-    if (intervalovigiaPix) clearInterval(intervalovigiaPix);
 }
