@@ -1,5 +1,5 @@
 // --- 1. CONFIGURAÇÕES E VARIÁVEIS GLOBAIS ---
-const API_URL = ""; // Caminho relativo para funcionar em qualquer domínio
+const API_URL = ""; 
 const mp = new MercadoPago('APP_USR-200fec89-34ca-4a32-b5af-9293167ab200'); 
 
 let intervalovigiaPix = null;
@@ -17,36 +17,17 @@ let asesJogador = 0; asesDealer = 0;
 const naipes = ["C", "D", "H", "S"];
 const valores = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
 
-// --- 2. INICIALIZAÇÃO E SESSÃO (SINCRONIA COM BD) ---
+// --- 2. INICIALIZAÇÃO E SESSÃO ---
 
 window.onload = async function() {
     const usuarioSessao = localStorage.getItem("usuario_blackjack");
-
     if (usuarioSessao) {
         usuarioLogado = JSON.parse(usuarioSessao);
-        
-        // Busca o saldo REAL do banco de dados ao abrir o site para evitar bugs de memória local
-        try {
-            const resposta = await fetch(`${API_URL}/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: usuarioLogado.email, senha: "---" }) 
-            });
-            const dadosAtualizados = await resposta.json();
-            
-            saldoReal = dadosAtualizados.saldo;
-            usuarioLogado.saldo = saldoReal;
-            localStorage.setItem("usuario_blackjack", JSON.stringify(usuarioLogado));
-        } catch (e) {
-            console.log("Erro ao sincronizar com o banco, usando saldo local.");
-            saldoReal = usuarioLogado.saldo;
-        }
-
+        await atualizarSaldoPeloBanco(); // Busca sempre o valor oficial do MongoDB
         document.getElementById("login-screen").style.display = "none";
-        document.getElementById("balance").innerText = saldoReal;
         atualizarHeaderUsuario(); 
     }
-
+    
     document.getElementById("hit-button").onclick = pedirCarta;
     document.getElementById("stand-button").onclick = parar;
     document.getElementById("reset-button").onclick = iniciarRodadaComAposta;
@@ -61,7 +42,6 @@ async function fazerLogin() {
     const email = document.getElementById("user-email").value;
     const senha = document.getElementById("user-pass").value;
     const nome = document.getElementById("user-name").value;
-
     if (!email || !senha) return alert("Preencha e-mail e senha!");
 
     const rota = modoCadastro ? '/registrar' : '/login';
@@ -74,7 +54,6 @@ async function fazerLogin() {
             body: JSON.stringify(corpo)
         });
         const dados = await resposta.json();
-
         if (dados.erro) return alert(dados.erro);
 
         if (modoCadastro) {
@@ -91,23 +70,23 @@ async function fazerLogin() {
     } catch (err) { alert("Erro ao conectar ao servidor."); }
 }
 
-function toggleLogin() {
-    modoCadastro = !modoCadastro;
-    document.getElementById("login-title").innerText = modoCadastro ? "Criar Conta" : "Entrar no Cassino";
-    document.getElementById("user-name").style.display = modoCadastro ? "block" : "none";
-    document.getElementById("btn-login").innerText = modoCadastro ? "Cadastrar" : "Entrar";
+async function atualizarSaldoPeloBanco() {
+    if (!usuarioLogado) return;
+    try {
+        const res = await fetch(`${API_URL}/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: usuarioLogado.email, senha: "---" })
+        });
+        const dados = await res.json();
+        saldoReal = dados.saldo;
+        usuarioLogado.saldo = saldoReal;
+        localStorage.setItem("usuario_blackjack", JSON.stringify(usuarioLogado));
+        document.getElementById("balance").innerText = saldoReal;
+    } catch (e) { console.log("Erro ao sincronizar saldo."); }
 }
 
-function atualizarHeaderUsuario() {
-    if (usuarioLogado) {
-        document.getElementById("user-header").style.display = "flex";
-        document.getElementById("display-user-name").innerText = usuarioLogado.nome;
-    }
-}
-
-function logout() { localStorage.removeItem("usuario_blackjack"); location.reload(); }
-
-// --- 4. SISTEMA DE APOSTAS (COM SINCRONIZAÇÃO IMEDIATA) ---
+// --- 4. SISTEMA DE APOSTAS ---
 
 function apostar(valor) {
     if (jogoEmAndamento) return;
@@ -115,9 +94,8 @@ function apostar(valor) {
         saldoReal -= valor; 
         apostaAtual += valor;
         atualizarInterfaceDinheiro();
-        
-        // SALVA NO BANCO NA HORA: Retira o dinheiro da conta do jogador
-        sincronizarSaldoComBanco(); 
+        // Sincroniza com o banco para garantir que a aposta foi "paga"
+        sincronizarSaldoComBanco();
     } else { alert("Saldo insuficiente!"); }
 }
 
@@ -126,8 +104,6 @@ function limparAposta() {
     saldoReal += apostaAtual; 
     apostaAtual = 0;
     atualizarInterfaceDinheiro();
-    
-    // SALVA NO BANCO NA HORA: Devolve o dinheiro para a conta do jogador
     sincronizarSaldoComBanco();
 }
 
@@ -136,25 +112,21 @@ function atualizarInterfaceDinheiro() {
     document.getElementById("current-bet").innerText = apostaAtual;
 }
 
-// --- 5. LÓGICA DO JOGO ---
+// --- 5. LÓGICA DO JOGO (IDÊNTICA) ---
 
 function iniciarRodadaComAposta() {
     if (apostaAtual <= 0) return alert("Aposte fichas primeiro!");
     pontosJogador = 0; pontosDealer = 0; asesJogador = 0; asesDealer = 0;
     cartaOcultaObjeto = null; jogoEmAndamento = true;
-
     limparMesa(); 
-
     document.getElementById("hit-button").classList.remove("escondido");
     document.getElementById("stand-button").classList.remove("escondido");
     document.getElementById("hit-button").disabled = false;
     document.getElementById("stand-button").disabled = false;
     document.getElementById("chips-area").classList.add("escondido");
     document.getElementById("reset-button").classList.add("escondido");
-
     criarBaralho(); 
     embaralharBaralho();
-
     setTimeout(() => darCartaPara("jogador"), 200);
     setTimeout(() => darCartaPara("dealer"), 1000);
     setTimeout(() => darCartaPara("jogador"), 1800);
@@ -167,16 +139,13 @@ function darCartaPara(quem) {
     let partes = carta.split("-");
     let valor = pegarValor(carta);
     const simbolos = { "C": "♣", "D": "♦", "H": "♥", "S": "♠" };
-
     let container = document.createElement("div");
     container.classList.add("card-container");
     if (partes[1] === "H" || partes[1] === "D") container.classList.add("red");
-
     let tagCarta = document.createElement("div");
     tagCarta.classList.add("card");
     tagCarta.innerHTML = `<div class="card-back"></div><div class="card-front"><div>${partes[0]}</div><div>${simbolos[partes[1]]}</div></div>`;
     container.appendChild(tagCarta);
-
     if (quem == "jogador") {
         setTimeout(() => tagCarta.classList.add("flipped"), 200);
         pontosJogador += valor;
@@ -196,12 +165,6 @@ function darCartaPara(quem) {
     }
 }
 
-function pegarValor(c) {
-    let v = c.split("-")[0];
-    if (isNaN(v)) return (v === "A") ? 11 : 10;
-    return parseInt(v);
-}
-
 function pedirCarta() {
     darCartaPara("jogador");
     if (pontosJogador > 21) {
@@ -214,10 +177,8 @@ function pedirCarta() {
 async function parar() {
     document.getElementById("hit-button").disabled = true;
     document.getElementById("stand-button").disabled = true;
-
     if (cartaOcultaObjeto) cartaOcultaObjeto.classList.add("flipped");
     document.getElementById("dealer-score").innerText = formatarPlacar(pontosDealer, asesDealer);
-
     await new Promise(r => setTimeout(r, 1000));
     while (pontosDealer < 17) {
         darCartaPara("dealer");
@@ -225,7 +186,6 @@ async function parar() {
         await new Promise(r => setTimeout(r, 1200));
     }
     await new Promise(r => setTimeout(r, 1000));
-
     if (pontosDealer > 21 || pontosJogador > pontosDealer) finalizarRodada("ganhou");
     else if (pontosJogador < pontosDealer) finalizarRodada("perdeu");
     else finalizarRodada("empate");
@@ -237,35 +197,23 @@ function finalizarRodada(res) {
     document.getElementById("stand-button").classList.add("escondido");
     document.getElementById("chips-area").classList.remove("escondido");
     document.getElementById("reset-button").classList.remove("escondido");
-
-    if (res === "ganhou") { 
-        dispararCelebracao(); 
-        saldoReal += apostaAtual * 2; 
-    }
-    else if (res === "empate") { 
-        document.getElementById("tie-overlay").style.display = "flex"; 
-        saldoReal += apostaAtual; 
-    }
-    else { 
-        document.getElementById("defeat-overlay").style.display = "flex"; 
-    }
-
+    if (res === "ganhou") { dispararCelebracao(); saldoReal += apostaAtual * 2; }
+    else if (res === "empate") { document.getElementById("tie-overlay").style.display = "flex"; saldoReal += apostaAtual; }
+    else { document.getElementById("defeat-overlay").style.display = "flex"; }
     apostaAtual = 0; 
     atualizarInterfaceDinheiro(); 
-    sincronizarSaldoComBanco(); // Salva o prêmio ou confirma a perda
+    sincronizarSaldoComBanco();
 }
 
-// --- 6. COMEMORAÇÕES E LIMPEZA ---
+// --- 6. COMEMORAÇÕES E AUXILIARES ---
 
 function dispararCelebracao() {
     document.getElementById("victory-overlay").style.display = "flex";
     confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
 }
-
 function fecharCelebracao() { document.getElementById("victory-overlay").style.display = "none"; limparMesa(); }
 function fecharDerrota() { document.getElementById("defeat-overlay").style.display = "none"; limparMesa(); }
 function fecharTie() { document.getElementById("tie-overlay").style.display = "none"; limparMesa(); }
-
 function limparMesa() {
     document.getElementById("player-cards").innerHTML = "";
     document.getElementById("dealer-cards").innerHTML = "";
@@ -286,7 +234,7 @@ async function sincronizarSaldoComBanco() {
     } catch (e) { console.log("Erro ao salvar saldo"); }
 }
 
-// --- 7. PAGAMENTOS (MERCADO PAGO) ---
+// --- 7. PAGAMENTOS (SEM SOMA MANUAL NO SCRIPT) ---
 
 function abrirModalDeposito() {
     document.getElementById("pix-modal").style.display = "flex";
@@ -338,11 +286,11 @@ async function gerarFormularioCartao() {
                     .then(res => res.json())
                     .then(dados => {
                         if (dados.status === "approved") {
-                            saldoReal = dados.novoSaldo;
-                            usuarioLogado.saldo = saldoReal;
-                            localStorage.setItem("usuario_blackjack", JSON.stringify(usuarioLogado));
-                            document.getElementById("balance").innerText = saldoReal;
-                            alert("Sucesso!"); fecharModalPix(); resolve();
+                            // AQUI ESTÁ A CORREÇÃO: Pegamos o saldo que o servidor calculou
+                            atualizarSaldoPeloBanco(); 
+                            alert("Sucesso! Saldo atualizado pelo banco."); 
+                            fecharModalPix(); 
+                            resolve();
                         } else { alert("Recusado."); reject(); }
                     })
                     .catch(() => { alert("Erro servidor."); reject(); });
@@ -360,28 +308,20 @@ function iniciarVigiaPix(idPagamento) {
             const dados = await resposta.json();
             if (dados.status === 'approved') {
                 clearInterval(intervalovigiaPix);
-                const resUser = await fetch(`${API_URL}/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: usuarioLogado.email, senha: "---" })
-                });
-                const usuarioAtualizado = await resUser.json();
-                saldoReal = usuarioAtualizado.saldo;
-                usuarioLogado.saldo = saldoReal;
-                localStorage.setItem("usuario_blackjack", JSON.stringify(usuarioLogado));
-                document.getElementById("balance").innerText = saldoReal;
+                // BUSCA O SALDO OFICIAL QUE O WEBHOOK SALVOU
+                await atualizarSaldoPeloBanco();
                 fecharModalPix();
-                alert("✅ Depósito confirmado!");
+                alert("✅ Depósito confirmado e salvo!");
             }
         } catch (e) {}
     }, 3000); 
 }
 
+// Auxiliares
 function formatarPlacar(p, a) { return (a > 0 && p <= 21) ? `${p} / ${p - 10}` : p; }
+function toggleLogin() { modoCadastro = !modoCadastro; document.getElementById("login-title").innerText = modoCadastro ? "Criar Conta" : "Entrar no Cassino"; document.getElementById("user-name").style.display = modoCadastro ? "block" : "none"; document.getElementById("btn-login").innerText = modoCadastro ? "Cadastrar" : "Entrar"; document.getElementById("toggle-text").innerText = modoCadastro ? "Já tem conta? Entre aqui" : "Não tem conta? Cadastre-se"; }
+function atualizarHeaderUsuario() { if (usuarioLogado) { document.getElementById("user-header").style.display = "flex"; document.getElementById("display-user-name").innerText = usuarioLogado.nome; } }
+function logout() { localStorage.removeItem("usuario_blackjack"); location.reload(); }
+function pegarValor(c) { let v = c.split("-")[0]; if (isNaN(v)) return (v === "A") ? 11 : 10; return parseInt(v); }
 function criarBaralho() { baralho = []; naipes.forEach(n => valores.forEach(v => baralho.push(v + "-" + n))); }
-function embaralharBaralho() {
-    for (let i = baralho.length - 1; i > 0; i--) {
-        let j = Math.floor(Math.random() * (i + 1));
-        [baralho[i], baralho[j]] = [baralho[j], baralho[i]];
-    }
-}
+function embaralharBaralho() { for (let i = baralho.length - 1; i > 0; i--) { let j = Math.floor(Math.random() * (i + 1)); [baralho[i], baralho[j]] = [baralho[j], baralho[i]]; } }
