@@ -276,26 +276,32 @@ async function gerarFormularioCartao() {
             onReady: () => { console.log("Pronto"); },
             onError: (err) => { console.error(err); },
             onSubmit: (formData) => {
-                const deviceId = mp.getDeviceSessionId();
-                return new Promise((resolve, reject) => {
-                    fetch(`${API_URL}/processar-cartao`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ ...formData, device_id: deviceId }),
-                    })
-                    .then(res => res.json())
-                    .then(dados => {
-                        if (dados.status === "approved") {
-                            // AQUI ESTÁ A CORREÇÃO: Pegamos o saldo que o servidor calculou
-                            atualizarSaldoPeloBanco(); 
-                            alert("Sucesso! Saldo atualizado pelo banco."); 
-                            fecharModalPix(); 
-                            resolve();
-                        } else { alert("Recusado."); reject(); }
-                    })
-                    .catch(() => { alert("Erro servidor."); reject(); });
-                });
+    const deviceId = mp.getDeviceSessionId();
+    return new Promise((resolve, reject) => {
+        fetch(`${API_URL}/processar-cartao`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...formData, device_id: deviceId }),
+        })
+        .then(res => res.json())
+        .then(async (dados) => {
+            if (dados.status === "approved") {
+                // Em vez de somar, esperamos 2 segundos pro Webhook trabalhar 
+                // e puxamos o valor real do servidor
+                setTimeout(async () => {
+                    await atualizarSaldoPeloBanco();
+                    alert("✅ Pagamento aprovado! Saldo atualizado.");
+                    fecharModalPix();
+                    resolve();
+                }, 2000);
+            } else {
+                alert("Pagamento em processamento ou recusado.");
+                reject();
             }
+        })
+        .catch(() => { alert("Erro servidor."); reject(); });
+    });
+}
         }
     });
 }
