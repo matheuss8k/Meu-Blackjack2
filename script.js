@@ -1,6 +1,6 @@
 // --- 1. CONFIGURAÇÕES E VARIÁVEIS GLOBAIS ---
 // Removi a barra "/" do final para evitar links como "//login"
-const API_URL = "https://blackjack-matheus-oficial.onrender.com";
+const API_URL = "https://www.primetcg.com.br";
 const mp = new MercadoPago('APP_USR-200fec89-34ca-4a32-b5af-9293167ab200'); 
 
 let baralho = [];
