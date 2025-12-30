@@ -73,7 +73,7 @@ app.post('/atualizar-saldo', async (req, res) => {
     }
 });
 
-// --- ROTA PARA GERAR PIX (ATUALIZADA COM METADADOS) ---
+// --- ROTA PARA GERAR PIX (ATUALIZADA) ---
 app.post('/gerar-pix', async (req, res) => {
     try {
         const { valor, email, nome } = req.body;
@@ -88,7 +88,6 @@ app.post('/gerar-pix', async (req, res) => {
                     first_name: nome || 'Jogador',
                     last_name: 'Cliente' 
                 },
-                // RESOLVE AS PENDÊNCIAS DE ITENS DO MERCADO PAGO
                 additional_info: {
                     items: [
                         {
@@ -105,7 +104,10 @@ app.post('/gerar-pix', async (req, res) => {
         };
 
         const result = await payment.create(paymentData);
+
+        // AQUI ESTÁ O AJUSTE: Enviamos o ID do pagamento de volta para o jogo
         res.json({
+            id: result.id, 
             copia_e_cola: result.point_of_interaction.transaction_data.qr_code,
             imagem_qr: result.point_of_interaction.transaction_data.qr_code_base64
         });
@@ -113,6 +115,21 @@ app.post('/gerar-pix', async (req, res) => {
     } catch (error) {
         console.error("Erro ao gerar PIX:", error);
         res.status(500).json({ erro: "Erro ao gerar PIX" });
+    }
+});
+
+// --- NOVA ROTA: O JOGO VAI USAR ISSO PARA PERGUNTAR "JÁ PAGOU?" ---
+app.get('/consultar-pagamento/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const pagamento = await payment.get({ id: id });
+
+        res.json({ 
+            status: pagamento.status, 
+            valor: pagamento.transaction_amount 
+        });
+    } catch (error) {
+        res.status(500).json({ erro: "Erro ao consultar pagamento" });
     }
 });
 

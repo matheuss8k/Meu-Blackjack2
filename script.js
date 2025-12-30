@@ -2,6 +2,7 @@
 const API_URL = "";
 const mp = new MercadoPago('APP_USR-200fec89-34ca-4a32-b5af-9293167ab200'); 
 
+let intervalovigiaPix = null;
 let baralho = [];
 let cartaOcultaObjeto = null;
 let saldoReal = 0;
@@ -271,6 +272,7 @@ function fecharModalPix() { document.getElementById("pix-modal").style.display =
 async function solicitarPix() {
     const valor = document.getElementById("pix-valor").value;
     if (!valor || valor <= 0) return alert("Digite um valor válido!");
+
     try {
         const resposta = await fetch(`${API_URL}/gerar-pix`, {
             method: 'POST',
@@ -278,9 +280,15 @@ async function solicitarPix() {
             body: JSON.stringify({ valor: valor, email: usuarioLogado.email, nome: usuarioLogado.nome })
         });
         const dados = await resposta.json();
+
+        // Mostra o QR Code
         document.getElementById("pix-img").src = `data:image/jpeg;base64,${dados.imagem_qr}`;
         document.getElementById("pix-copia-cola").value = dados.copia_e_cola;
         document.getElementById("pix-resultado").style.display = "block";
+
+        // --- INICIA O VIGIA AQUI ---
+        iniciarVigiaPix(dados.id);
+
     } catch (err) { alert("Erro ao gerar PIX."); }
 }
 
@@ -339,4 +347,37 @@ function embaralharBaralho() {
         let j = Math.floor(Math.random() * (i + 1));
         [baralho[i], baralho[j]] = [baralho[j], baralho[i]];
     }
+}
+
+function iniciarVigiaPix(idPagamento) {
+    // Se já tiver um vigia rodando, para ele antes de começar outro
+    if (intervalovigiaPix) clearInterval(intervalovigiaPix);
+
+    // Pergunta ao servidor a cada 3 segundos
+    intervalovigiaPix = setInterval(async () => {
+        try {
+            const resposta = await fetch(`${API_URL}/consultar-pagamento/${idPagamento}`);
+            const dados = await resposta.json();
+
+            if (dados.status === 'approved') {
+                clearInterval(intervalovigiaPix); // Para o vigia imediatamente
+                
+                // ATUALIZA O SALDO NA TELA (Soma o valor aprovado)
+                saldoReal += Number(dados.valor);
+                usuarioLogado.saldo = saldoReal;
+                localStorage.setItem("usuario_blackjack", JSON.stringify(usuarioLogado));
+                document.getElementById("balance").innerText = saldoReal;
+
+                // FECHA A TELA E AVISA O SUCESSO
+                fecharModalPix();
+                alert("✅ Pagamento PIX confirmado! R$ " + dados.valor + " adicionados.");
+            }
+        } catch (e) { console.log("Aguardando confirmação do banco..."); }
+    }, 3000); 
+}
+
+// Ajuste a fecharModalPix para parar o vigia se o usuário desistir e fechar
+function fecharModalPix() {
+    document.getElementById("pix-modal").style.display = "none";
+    if (intervalovigiaPix) clearInterval(intervalovigiaPix);
 }
