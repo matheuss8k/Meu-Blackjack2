@@ -3,170 +3,163 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blackjack Pro - Live Experience</title>
-    <!-- Bibliotecas Externas -->
+    <title>Blackjack Premium 3D</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://sdk.mercadopago.com/js/v2"></script>
-    <!-- Fonte Moderna -->
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- CENÁRIO 3D -->
+    <!-- LAYER 3D: Apenas a mesa e objetos -->
     <div class="scene">
-        <!-- Luzes e Ambiente de Fundo -->
-        <div class="background-decor">
-            <div class="light-beam left"></div>
-            <div class="light-beam right"></div>
-        </div>
-
-        <!-- A MESA INCLINADA -->
         <div class="table-container">
             <div class="table-surface">
-                <!-- Textos pintados no feltro -->
-                <div class="felt-decorations">
-                    <h2>BLACKJACK PAYS 3:2</h2>
-                    <p>Dealer must stand on 17 and draw to 16</p>
-                </div>
-
-                <!-- Sabot (Baralho Físico 3D) -->
+                <!-- Baralho (Sabot) -->
                 <div id="deck-visual" class="shoe-3d">
-                    <div class="shoe-top"></div>
+                    <div class="shoe-lid"></div>
+                    <div class="shoe-front"></div>
                 </div>
 
-                <!-- Área Dealer -->
-                <div id="dealer-area" class="zone dealer-zone">
+                <!-- Dealer -->
+                <div class="dealer-zone">
                     <div class="zone-label">DEALER</div>
                     <div id="dealer-cards" class="cards-row"></div>
-                    <div class="score-pill hidden" id="dealer-score-box">
-                        <span id="dealer-score">0</span>
-                    </div>
+                    <div id="dealer-score-box" class="score-display">0</div>
                 </div>
 
-                <!-- Área Única do Jogador (Hero Spot) -->
-                <div id="player-area" class="zone player-zone active-spot">
-                    <div class="spot-light"></div>
+                <!-- TEXTO DA MESA (Agora no meio exato e legível) -->
+                <div class="table-center-text">
+                    <h2>BLACKJACK</h2>
+                    <h3>PAYS 3 TO 2</h3>
+                    <p>Dealer must stand on 17</p>
+                </div>
+
+                <!-- Jogador -->
+                <div class="player-zone active-spot">
+                    <div class="spot-glow"></div>
                     <div class="zone-border"></div>
                     <div id="player-cards" class="cards-row"></div>
-                    <div class="player-hud-floating">
-                        <span class="label">VOCÊ</span>
-                        <div class="score-badge" id="player-score">0</div>
+                    <!-- Score flutuante anexado ao player -->
+                    <div class="player-hud">
+                        <span id="player-score" class="score-bubble">0</span>
                     </div>
+                    <div class="zone-label player-label">VOCÊ</div>
                 </div>
-            </div> <!-- Fim Surface -->
+            </div>
             
-            <!-- Borda de Madeira da Mesa -->
+            <!-- Borda Grossa da Mesa -->
             <div class="table-edge"></div>
         </div>
     </div>
 
-    <!-- INTERFACE 2D (HUD) - FICA SOBRE O 3D -->
+    <!-- LAYER UI (2D): Controles, Menus e Botões -->
     <div class="ui-layer">
         
-        <!-- Topo: Info User -->
+        <!-- Header -->
         <header id="user-header">
-            <div class="profile-pill">
-                <span class="avatar">👤</span>
-                <div class="user-details">
+            <div class="user-profile">
+                <div class="avatar-circle">👤</div>
+                <div class="user-text">
                     <span id="display-user-name">Convidado</span>
-                    <span class="status-online">Online</span>
+                    <span class="status-indicator">● Online</span>
                 </div>
             </div>
-            <div class="top-actions">
-                <button id="btn-deposit" onclick="abrirModalDeposito()" class="btn-gold-grad">
-                    <span>+</span> R$
+
+            <div class="top-buttons">
+                <button id="btn-deposit" onclick="abrirModalDeposito()" class="btn-deposit">
+                    + SALDO
                 </button>
-                <button id="logout-button" onclick="logout()" class="btn-icon">Exit</button>
+                <button id="logout-button" onclick="logout()" class="btn-exit">
+                    Sair <span>✖</span>
+                </button>
             </div>
         </header>
 
-        <!-- Mensagens Flutuantes (Vitória/Derrota) -->
-        <!-- Mantive os IDs para não quebrar o JS, mas mudei o CSS -->
-        <div id="victory-overlay" class="game-message win">
-            <h1>VOCÊ VENCEU</h1>
-            <button onclick="fecharCelebracao()">Continuar</button>
-        </div>
-        <div id="defeat-overlay" class="game-message lose">
-            <h1>BANCA VENCEU</h1>
-            <button onclick="fecharDerrota()">Tentar Novamente</button>
-        </div>
-        <div id="tie-overlay" class="game-message tie">
-            <h1>EMPATE</h1>
-            <button onclick="fecharTie()">Retornar Aposta</button>
-        </div>
-
-        <!-- Controles Inferiores -->
-        <div class="bottom-bar">
-            <!-- Saldo e Apostas -->
-            <div class="financial-panel">
-                <div class="finance-item">
-                    <span class="lbl">SALDO</span>
-                    <span class="val">R$ <span id="balance">0.00</span></span>
+        <!-- Barra Inferior de Jogo -->
+        <div class="bottom-controls">
+            <!-- Infos Financeiras -->
+            <div class="money-panel">
+                <div class="money-item">
+                    <label>SALDO</label>
+                    <span class="value">R$ <span id="balance">0</span></span>
                 </div>
-                <div class="finance-item">
-                    <span class="lbl">APOSTA</span>
-                    <span class="val bet-val">R$ <span id="current-bet">0</span></span>
+                <div class="money-item">
+                    <label>APOSTA</label>
+                    <span class="value yellow">R$ <span id="current-bet">0</span></span>
                 </div>
             </div>
 
-            <!-- Fichas (Centralizado) -->
-            <div id="chips-area" class="chips-container">
-                <div class="chip chip-10" onclick="apostar(10)">10</div>
-                <div class="chip chip-50" onclick="apostar(50)">50</div>
-                <div class="chip chip-100" onclick="apostar(100)">100</div>
-                <button id="clear-bet" onclick="limparAposta()" class="btn-text">Limpar</button>
+            <!-- Fichas (Ficam escondidas durante jogo via JS 'escondido') -->
+            <div id="chips-area" class="chips-selector">
+                <button class="chip chip-10" onclick="apostar(10)">10</button>
+                <button class="chip chip-50" onclick="apostar(50)">50</button>
+                <button class="chip chip-100" onclick="apostar(100)">100</button>
+                <button id="clear-bet" onclick="limparAposta()" class="btn-clear">✖</button>
             </div>
 
-            <!-- Ações (Direita) -->
-            <div id="controls" class="action-panel">
-                <button id="reset-button" class="btn-big deal">DISTRIBUIR CARTAS</button>
-                <div class="in-game-buttons">
-                    <button id="hit-button" class="btn-action hit hidden">
-                        <span class="icon">+</span> PEDIR
-                    </button>
-                    <button id="stand-button" class="btn-action stand hidden">
-                        <span class="icon">✋</span> PARAR
-                    </button>
-                </div>
+            <!-- Botão Gigante de Dar Cartas -->
+            <div class="action-area-start">
+                <button id="reset-button" class="btn-deal">DISTRIBUIR CARTAS</button>
+            </div>
+
+            <!-- Ações IN-GAME (Hit/Stand) - O JS remove a classe 'escondido' para mostrar -->
+            <div class="in-game-actions">
+                <button id="hit-button" class="btn-action btn-hit escondido">PEDIR CARTAS</button>
+                <button id="stand-button" class="btn-action btn-stand escondido">MANTER (STOP)</button>
             </div>
         </div>
     </div>
 
-    <!-- Modais de Login/Pix (Mantendo a estrutura base) -->
-    <div id="login-screen" class="modal-glass">
-        <div class="glass-card">
-            <h2 id="login-title">Blackjack Live</h2>
-            <p>Faça login para jogar</p>
-            <input type="text" id="user-name" placeholder="Seu Nome" class="input-glass" style="display:none;">
-            <input type="email" id="user-email" placeholder="E-mail" class="input-glass">
-            <input type="password" id="user-pass" placeholder="Senha" class="input-glass">
-            <button onclick="fazerLogin()" id="btn-login" class="btn-neon">ENTRAR</button>
-            <p id="toggle-text" class="link-small" onclick="toggleLogin()">Criar Conta</p>
+    <!-- MODAIS E OVERLAYS -->
+    
+    <!-- Login -->
+    <div id="login-screen" class="modal-overlay">
+        <div class="modal-card">
+            <h2>Bem-vindo</h2>
+            <input type="text" id="user-name" placeholder="Nome" class="input-dark" style="display:none;">
+            <input type="email" id="user-email" placeholder="Email" class="input-dark">
+            <input type="password" id="user-pass" placeholder="Senha" class="input-dark">
+            <button onclick="fazerLogin()" id="btn-login" class="btn-neon-green">ENTRAR</button>
+            <p id="toggle-text" onclick="toggleLogin()">Criar conta</p>
         </div>
     </div>
 
-    <div id="pix-modal" class="modal-glass hidden-init">
-        <div class="glass-card">
-            <h3>Adicionar Fundos</h3>
+    <!-- Pix / Deposito -->
+    <div id="pix-modal" class="modal-overlay escondido">
+        <div class="modal-card wide">
+            <h3>Adicionar Fichas</h3>
             <div id="deposit-options">
-                <input type="number" id="pix-valor" placeholder="Valor (R$)" class="input-glass">
-                <div class="pay-btns">
-                    <button onclick="gerarFormularioCartao()" class="btn-glass">Cartão</button>
-                    <button onclick="solicitarPix()" class="btn-neon">Gerar PIX</button>
+                <input type="number" id="pix-valor" placeholder="Valor (R$)" class="input-dark">
+                <div class="row-btns">
+                    <button onclick="gerarFormularioCartao()" class="btn-outline">Cartão</button>
+                    <button onclick="solicitarPix()" class="btn-neon-green">PIX</button>
                 </div>
             </div>
             <div id="cardPaymentBrick_container"></div>
-            <div id="pix-resultado" style="display:none; text-align:center;">
-                <p>Escaneie o QR Code:</p>
-                <img id="pix-img" style="width: 150px; border-radius:10px;">
-                <input id="pix-copia-cola" readonly class="input-glass" style="font-size:10px;">
+            <div id="pix-resultado" style="display:none;">
+                <p>Pagamento Seguro</p>
+                <img id="pix-img" class="qr-img">
+                <textarea id="pix-copia-cola"></textarea>
             </div>
-            <button onclick="fecharModalPix()" class="link-small" style="background:none; border:none; margin-top:10px;">Cancelar</button>
+            <button onclick="fecharModalPix()" class="btn-text-close">Cancelar</button>
         </div>
     </div>
 
+    <!-- Mensagens de Resultado -->
+    <div id="victory-overlay" class="msg-overlay win-bg escondido">
+        <h1>VOCÊ GANHOU!</h1>
+        <button onclick="fecharCelebracao()">Continuar</button>
+    </div>
+    <div id="defeat-overlay" class="msg-overlay lose-bg escondido">
+        <h1>A BANCA VENCEU</h1>
+        <button onclick="fecharDerrota()">Tentar Novamente</button>
+    </div>
+    <div id="tie-overlay" class="msg-overlay tie-bg escondido">
+        <h1>EMPATE</h1>
+        <button onclick="fecharTie()">Voltar</button>
+    </div>
+
     <script src="script.js"></script>
-    <style> .hidden-init { display: none !important; } </style>
 </body>
 </html>
