@@ -3,126 +3,170 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blackjack Pro - Cassino Definitivo</title>
-    
-    <!-- Scripts Externos -->
+    <title>Blackjack Pro - Live Experience</title>
+    <!-- Bibliotecas Externas -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://sdk.mercadopago.com/js/v2"></script>
-    
+    <!-- Fonte Moderna -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- 1. Cabeçalho do Usuário -->
-    <header id="user-header">
-        <div class="user-info">
-            <span class="user-icon">👤</span>
-            <span id="display-user-name">Jogador</span>
-        </div>
-        <div class="user-actions">
-            <button id="btn-deposit" onclick="abrirModalDeposito()">Depositar R$</button>
-            <button id="logout-button" onclick="logout()">Sair</button>
-        </div>
-    </header>
-
-    <!-- 2. Tela de Login (Fundo Preto Total) -->
-    <div id="login-screen" class="modal-overlay">
-        <div class="modal-content">
-            <h2 id="login-title">Entrar no Cassino</h2>
-            <input type="text" id="user-name" placeholder="Seu Nome (Para cadastro)" class="login-input" style="display:none;">
-            <input type="email" id="user-email" placeholder="E-mail" class="login-input">
-            <input type="password" id="user-pass" placeholder="Senha" class="login-input">
-            <button onclick="fazerLogin()" id="btn-login" class="btn-main-login">Entrar</button>
-            <p id="toggle-text" class="toggle-link" onclick="toggleLogin()">Não tem conta? Cadastre-se</p>
-        </div>
-    </div>
-
-    <!-- 3. Telas de Resultado (Overlays Transparentes) -->
-    <div id="victory-overlay" class="result-overlay">
-        <div class="result-content">
-            <h1 class="victory-title">✨ VOCÊ VENCEU! ✨</h1>
-            <button onclick="fecharCelebracao()" class="action-btn primary">Continuar</button>
-        </div>
-    </div>
-
-    <div id="defeat-overlay" class="result-overlay">
-        <div class="result-content">
-            <h1 class="defeat-title">A BANCA VENCEU</h1>
-            <button onclick="fecharDerrota()" class="action-btn">Tentar Novamente</button>
-        </div>
-    </div>
-
-    <div id="tie-overlay" class="result-overlay">
-        <div class="result-content">
-            <h1 class="tie-title">EMPATE</h1>
-            <button onclick="fecharTie()" class="action-btn">Recuperar Aposta</button>
-        </div>
-    </div>
-
-    <!-- 4. Elementos de Jogo -->
-    <h1>Blackjack</h1>
-    <div id="deck-visual"></div>
-
-    <div class="game-container">
-        <!-- Área do Dealer -->
-        <div id="dealer-area" class="game-section">
-            <div id="dealer-cards" class="cards-display"></div>
-            <p class="score-text">Dealer: <span id="dealer-score">0</span></p>
+    <!-- CENÁRIO 3D -->
+    <div class="scene">
+        <!-- Luzes e Ambiente de Fundo -->
+        <div class="background-decor">
+            <div class="light-beam left"></div>
+            <div class="light-beam right"></div>
         </div>
 
-        <!-- Área do Jogador -->
-        <div id="player-area" class="game-section">
-            <div id="player-cards" class="cards-display"></div>
-            <p class="score-text">Você: <span id="player-score">0</span></p>
-        </div>
-    </div>
+        <!-- A MESA INCLINADA -->
+        <div class="table-container">
+            <div class="table-surface">
+                <!-- Textos pintados no feltro -->
+                <div class="felt-decorations">
+                    <h2>BLACKJACK PAYS 3:2</h2>
+                    <p>Dealer must stand on 17 and draw to 16</p>
+                </div>
 
-    <!-- 5. Rodapé (Apostas e Botões) -->
-    <div id="betting-and-controls">
-        <div id="money-area">
-            Saldo: R$ <span id="balance">0</span> | Aposta: R$ <span id="current-bet">0</span>
-        </div>
+                <!-- Sabot (Baralho Físico 3D) -->
+                <div id="deck-visual" class="shoe-3d">
+                    <div class="shoe-top"></div>
+                </div>
 
-        <div id="chips-area">
-            <button class="chip chip-10" onclick="apostar(10)">10</button>
-            <button class="chip chip-50" onclick="apostar(50)">50</button>
-            <button class="chip chip-100" onclick="apostar(100)">100</button>
-            <button id="clear-bet" onclick="limparAposta()">Limpar Aposta</button>
-        </div>
+                <!-- Área Dealer -->
+                <div id="dealer-area" class="zone dealer-zone">
+                    <div class="zone-label">DEALER</div>
+                    <div id="dealer-cards" class="cards-row"></div>
+                    <div class="score-pill hidden" id="dealer-score-box">
+                        <span id="dealer-score">0</span>
+                    </div>
+                </div>
 
-        <div id="controls">
-            <button id="hit-button" class="action-btn">Pedir (Hit)</button>
-            <button id="stand-button" class="action-btn">Parar (Stand)</button>
-            <button id="reset-button" class="action-btn primary">Distribuir Cartas</button>
-        </div>
-    </div>
-
-    <!-- 6. Janela de Depósito (PIX e Cartão) -->
-    <div id="pix-modal" class="result-overlay">
-        <div class="modal-content" style="max-height: 90vh; overflow-y: auto; width: 350px;">
-            <h3>Depositar Fichas</h3>
+                <!-- Área Única do Jogador (Hero Spot) -->
+                <div id="player-area" class="zone player-zone active-spot">
+                    <div class="spot-light"></div>
+                    <div class="zone-border"></div>
+                    <div id="player-cards" class="cards-row"></div>
+                    <div class="player-hud-floating">
+                        <span class="label">VOCÊ</span>
+                        <div class="score-badge" id="player-score">0</div>
+                    </div>
+                </div>
+            </div> <!-- Fim Surface -->
             
+            <!-- Borda de Madeira da Mesa -->
+            <div class="table-edge"></div>
+        </div>
+    </div>
+
+    <!-- INTERFACE 2D (HUD) - FICA SOBRE O 3D -->
+    <div class="ui-layer">
+        
+        <!-- Topo: Info User -->
+        <header id="user-header">
+            <div class="profile-pill">
+                <span class="avatar">👤</span>
+                <div class="user-details">
+                    <span id="display-user-name">Convidado</span>
+                    <span class="status-online">Online</span>
+                </div>
+            </div>
+            <div class="top-actions">
+                <button id="btn-deposit" onclick="abrirModalDeposito()" class="btn-gold-grad">
+                    <span>+</span> R$
+                </button>
+                <button id="logout-button" onclick="logout()" class="btn-icon">Exit</button>
+            </div>
+        </header>
+
+        <!-- Mensagens Flutuantes (Vitória/Derrota) -->
+        <!-- Mantive os IDs para não quebrar o JS, mas mudei o CSS -->
+        <div id="victory-overlay" class="game-message win">
+            <h1>VOCÊ VENCEU</h1>
+            <button onclick="fecharCelebracao()">Continuar</button>
+        </div>
+        <div id="defeat-overlay" class="game-message lose">
+            <h1>BANCA VENCEU</h1>
+            <button onclick="fecharDerrota()">Tentar Novamente</button>
+        </div>
+        <div id="tie-overlay" class="game-message tie">
+            <h1>EMPATE</h1>
+            <button onclick="fecharTie()">Retornar Aposta</button>
+        </div>
+
+        <!-- Controles Inferiores -->
+        <div class="bottom-bar">
+            <!-- Saldo e Apostas -->
+            <div class="financial-panel">
+                <div class="finance-item">
+                    <span class="lbl">SALDO</span>
+                    <span class="val">R$ <span id="balance">0.00</span></span>
+                </div>
+                <div class="finance-item">
+                    <span class="lbl">APOSTA</span>
+                    <span class="val bet-val">R$ <span id="current-bet">0</span></span>
+                </div>
+            </div>
+
+            <!-- Fichas (Centralizado) -->
+            <div id="chips-area" class="chips-container">
+                <div class="chip chip-10" onclick="apostar(10)">10</div>
+                <div class="chip chip-50" onclick="apostar(50)">50</div>
+                <div class="chip chip-100" onclick="apostar(100)">100</div>
+                <button id="clear-bet" onclick="limparAposta()" class="btn-text">Limpar</button>
+            </div>
+
+            <!-- Ações (Direita) -->
+            <div id="controls" class="action-panel">
+                <button id="reset-button" class="btn-big deal">DISTRIBUIR CARTAS</button>
+                <div class="in-game-buttons">
+                    <button id="hit-button" class="btn-action hit hidden">
+                        <span class="icon">+</span> PEDIR
+                    </button>
+                    <button id="stand-button" class="btn-action stand hidden">
+                        <span class="icon">✋</span> PARAR
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modais de Login/Pix (Mantendo a estrutura base) -->
+    <div id="login-screen" class="modal-glass">
+        <div class="glass-card">
+            <h2 id="login-title">Blackjack Live</h2>
+            <p>Faça login para jogar</p>
+            <input type="text" id="user-name" placeholder="Seu Nome" class="input-glass" style="display:none;">
+            <input type="email" id="user-email" placeholder="E-mail" class="input-glass">
+            <input type="password" id="user-pass" placeholder="Senha" class="input-glass">
+            <button onclick="fazerLogin()" id="btn-login" class="btn-neon">ENTRAR</button>
+            <p id="toggle-text" class="link-small" onclick="toggleLogin()">Criar Conta</p>
+        </div>
+    </div>
+
+    <div id="pix-modal" class="modal-glass hidden-init">
+        <div class="glass-card">
+            <h3>Adicionar Fundos</h3>
             <div id="deposit-options">
-                <input type="number" id="pix-valor" placeholder="Valor R$ (ex: 10)" class="login-input">
-                <button onclick="gerarFormularioCartao()" class="btn-main-login" style="background: #2980b9; margin-bottom: 10px;">Pagar com Cartão</button>
-                <button onclick="solicitarPix()" class="btn-main-login">Gerar PIX</button>
+                <input type="number" id="pix-valor" placeholder="Valor (R$)" class="input-glass">
+                <div class="pay-btns">
+                    <button onclick="gerarFormularioCartao()" class="btn-glass">Cartão</button>
+                    <button onclick="solicitarPix()" class="btn-neon">Gerar PIX</button>
+                </div>
             </div>
-
-            <!-- Onde o formulário do cartão vai "nascer" -->
             <div id="cardPaymentBrick_container"></div>
-
-            <!-- Resultado do PIX -->
-            <div id="pix-resultado" style="display:none; margin-top: 15px;">
+            <div id="pix-resultado" style="display:none; text-align:center;">
                 <p>Escaneie o QR Code:</p>
-                <img id="pix-img" style="width: 180px; height: 180px; margin: 10px 0;">
-                <textarea id="pix-copia-cola" style="width: 100%; font-size: 10px; height: 40px;" readonly></textarea>
-                <p style="font-size: 11px; color: #666;">O saldo cai após o pagamento.</p>
+                <img id="pix-img" style="width: 150px; border-radius:10px;">
+                <input id="pix-copia-cola" readonly class="input-glass" style="font-size:10px;">
             </div>
-            
-            <button onclick="fecharModalPix()" class="toggle-link" style="border: none; background: none;">Cancelar</button>
+            <button onclick="fecharModalPix()" class="link-small" style="background:none; border:none; margin-top:10px;">Cancelar</button>
         </div>
     </div>
 
     <script src="script.js"></script>
+    <style> .hidden-init { display: none !important; } </style>
 </body>
 </html>

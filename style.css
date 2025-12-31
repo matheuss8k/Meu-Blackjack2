@@ -1,148 +1,336 @@
-/* --- 1. CONFIGURAÇÕES GERAIS E FIT SCREEN --- */
 :root {
-    --verde-cassino: #1a472a;
-    --verde-claro: #2c5e2e;
-    --dourado: #ffd700;
-    --vermelho-naipe: #e74c3c;
-}
-
-html, body {
-    height: 100vh;
-    margin: 0; padding: 0;
-    overflow: hidden; /* Remove a barra de rolagem lateral */
+    --bg-dark: #0f1215;
+    --table-green: #0a4f32; /* Verde feltro escuro */
+    --felt-texture: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.4) 90%);
+    --wood: #3e2723;
+    --gold: #cfa860;
+    --neon-green: #00ff88;
+    --card-shadow: 2px 5px 10px rgba(0,0,0,0.4);
 }
 
 body {
-    background-color: var(--verde-cassino);
-    background-image: radial-gradient(circle, var(--verde-claro) 0%, var(--verde-cassino) 100%);
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    overflow: hidden;
+    background-color: var(--bg-dark);
+    font-family: 'Montserrat', sans-serif;
     color: white;
-    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+/* --- AMBIENTE 3D --- */
+.scene {
+    width: 100vw;
+    height: 100vh;
+    perspective: 1200px; /* Profundidade */
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 10%, #252a30, #000);
+}
+
+/* Luzes decorativas ao fundo (Verticais) */
+.background-decor .light-beam {
+    position: absolute;
+    width: 2px;
+    height: 100vh;
+    background: linear-gradient(to bottom, transparent, var(--gold), transparent);
+    opacity: 0.3;
+}
+.background-decor .left { left: 10%; box-shadow: 0 0 20px var(--gold); }
+.background-decor .right { right: 10%; box-shadow: 0 0 20px var(--gold); }
+
+/* --- A MESA --- */
+.table-container {
+    width: 1000px;
+    height: 800px;
+    position: absolute;
+    top: 50%; left: 50%;
+    /* Rotação crucial para o efeito 3D */
+    transform: translate(-50%, -40%) rotateX(30deg);
+    transform-style: preserve-3d;
+}
+
+.table-surface {
+    width: 100%; height: 100%;
+    background-color: var(--table-green);
+    background-image: var(--felt-texture), url('https://www.transparenttextures.com/patterns/felt.png');
+    border-radius: 300px 300px 200px 200px; /* Formato feijão */
+    border: 15px solid var(--wood);
+    box-shadow: inset 0 0 100px #000, 0 50px 100px #000;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Bordas iluminadas na mesa */
+.felt-decorations {
+    position: absolute;
+    top: 25%;
+    width: 100%;
+    text-align: center;
+    color: rgba(255, 215, 0, 0.3);
+    transform: rotateX(0deg); /* Texto plano na mesa */
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+    pointer-events: none;
+}
+.felt-decorations h2 { margin: 0; font-size: 1.5rem; letter-spacing: 2px; }
+
+/* Zonas de Cartas */
+.zone {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: flex-end;
 }
 
-h1 { font-size: 1.6rem; color: var(--dourado); margin: 5px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+.dealer-zone { top: 10%; width: 400px; height: 150px; }
+.player-zone { bottom: 120px; width: 350px; height: 180px; }
 
-/* --- 2. CABEÇALHO --- */
-#user-header {
-    width: 100%; height: 50px;
-    display: none; justify-content: space-between; align-items: center;
-    background: rgba(0, 0, 0, 0.8); padding: 0 20px;
-    border-bottom: 1px solid var(--dourado); box-sizing: border-box;
-    z-index: 500;
+/* Slot do Player Brilhante */
+.player-zone.active-spot .zone-border {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    box-shadow: 0 0 15px rgba(255,255,255,0.05);
+}
+.spot-light {
+    position: absolute; width: 100%; height: 100%;
+    background: radial-gradient(ellipse at center, rgba(255,255,255,0.1) 0%, transparent 70%);
 }
 
-.user-info { display: flex; align-items: center; gap: 10px; }
-.user-icon { font-size: 18px; background: var(--dourado); border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; color: #333; }
-
-#btn-deposit {
-    background: var(--dourado); color: #111; font-weight: bold; border: none;
-    padding: 6px 15px; border-radius: 5px; cursor: pointer; margin-right: 10px; transition: 0.3s;
-}
-#btn-deposit:hover { transform: scale(1.05); background: white; }
-
-#logout-button { background: none; border: 1px solid #e74c3c; color: #e74c3c; cursor: pointer; border-radius: 4px; padding: 4px 10px; transition: 0.3s; }
-#logout-button:hover { background: #e74c3c; color: white; }
-
-/* --- 3. MESA CENTRAL (AJUSTÁVEL) --- */
-.game-container {
-    flex: 1; width: 100%;
-    display: flex; flex-direction: column;
-    justify-content: center; align-items: center; gap: 5px;
+.cards-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 120px;
+    z-index: 10;
 }
 
-.game-section {
-    background-color: rgba(0, 0, 0, 0.2);
-    border-radius: 15px; padding: 10px;
-    width: 90%; max-width: 500px;
-    text-align: center; border: 1px solid rgba(255,255,255,0.1);
-    min-height: 170px;
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
+/* O Baralho 3D (Sabot) */
+.shoe-3d {
+    position: absolute;
+    top: 15%; right: 15%;
+    width: 80px; height: 120px;
+    background: #111;
+    border-radius: 10px;
+    transform: rotateZ(-20deg) translateY(-20px);
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.5);
+    border-bottom: 5px solid #333;
+}
+.shoe-top {
+    position: absolute;
+    top: 5px; left: 5px;
+    width: 70px; height: 40px;
+    background: linear-gradient(to right, #ccc, #fff, #ccc); /* Simula cartas */
+    border-radius: 4px;
 }
 
-.cards-display { display: flex; justify-content: center; gap: 8px; height: 115px; align-items: center; }
-.score-text { font-size: 1rem; margin: 5px 0; font-weight: bold; background: rgba(0,0,0,0.2); padding: 2px 10px; border-radius: 10px; }
-
-/* --- 4. BARALHO E ANIMAÇÃO --- */
-#deck-visual {
-    width: 75px; height: 110px;
-    position: fixed; top: 45%; left: 52%;
-    transform: translate(280px, -50%);
-    background-color: #1a3a1b; border: 2px solid white; border-radius: 8px;
-    background-image: repeating-linear-gradient(45deg, #2c5e2e 0px, #2c5e2e 2px, #1a3a1b 2px, #1a3a1b 10px);
-    box-shadow: -2px 2px 0px white, -4px 4px 0px #1a3a1b, -6px 6px 0px white, -10px 10px 20px rgba(0,0,0,0.5);
-    z-index: 100;
+/* --- ESTILO DAS CARTAS --- */
+/* Isso sobrescreve/adapta o que o JS gera */
+.card-container {
+    width: 80px; height: 115px;
+    margin: 0 5px; 
+    transition: all 0.6s cubic-bezier(0.25, 0.8, 0.25, 1);
+    position: relative;
+    /* Correção do transform 2D para funcionar na mesa inclinada */
+    transform-style: preserve-3d;
 }
 
-.card-container { width: 75px; height: 110px; position: relative; animation: dealCard 0.8s ease-out; }
-@keyframes dealCard {
-    0% { opacity: 0; transform: translate(300px, 0) rotate(45deg); }
-    100% { opacity: 1; transform: translate(0, 0) rotate(0deg); }
+.card {
+    width: 100%; height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.6s;
+    box-shadow: 2px 2px 10px rgba(0,0,0,0.4);
+    border-radius: 6px;
 }
-
-.card { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.6s; }
 .card.flipped { transform: rotateY(180deg); }
 
-.card-front, .card-back { 
-    position: absolute; width: 100%; height: 100%; backface-visibility: hidden; 
-    border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; 
-    font-weight: bold; font-size: 20px; box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
-    border: 2px solid white; box-sizing: border-box; 
+/* Ajuste das faces para serem bonitas */
+.card-back {
+    position: absolute; width: 100%; height: 100%;
+    backface-visibility: hidden;
+    background: linear-gradient(135deg, #a00000 0%, #700000 100%);
+    border: 3px solid white;
+    border-radius: 6px;
+    background-size: 10px 10px; /* Padrão simples */
 }
-.card-back { background-color: #1a3a1b; background-image: repeating-linear-gradient(45deg, #2c5e2e 0px, #2c5e2e 2px, #1a3a1b 2px, #1a3a1b 10px); }
-.card-front { background: white; color: black; transform: rotateY(180deg); font-family: 'Courier New', monospace; }
-.red .card-front { color: var(--vermelho-naipe); }
+.card-front {
+    position: absolute; width: 100%; height: 100%;
+    backface-visibility: hidden;
+    background: white;
+    transform: rotateY(180deg);
+    border-radius: 6px;
+    display: flex; flex-direction: column; 
+    align-items: center; justify-content: center;
+    font-family: 'Courier New', monospace;
+    font-weight: bold; font-size: 1.4rem;
+}
+.red .card-front { color: #e74c3c; }
 
-/* --- 5. RODAPÉ FIXO --- */
-#betting-and-controls {
-    width: 100%; background: rgba(0,0,0,0.5); padding: 10px 0; text-align: center;
-    border-top: 1px solid rgba(255,255,255,0.1); min-height: 180px;
-    display: flex; flex-direction: column; justify-content: center;
+/* Animação de Dar Cartas: Precisa vir "de cima do deck" */
+@keyframes dealCard {
+    0% { opacity: 0; transform: translate(300px, -200px) scale(0.5); }
+    100% { opacity: 1; transform: translate(0, 0) scale(1); }
 }
 
-#money-area { font-weight: bold; color: var(--dourado); margin-bottom: 8px; font-size: 1.1rem; }
-.chip { width: 55px; height: 55px; border-radius: 50%; border: 3px dashed white; cursor: pointer; margin: 0 5px; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-.chip:hover { transform: translateY(-3px) scale(1.05); }
-.chip-10 { background: #c0392b; } .chip-50 { background: #2980b9; } .chip-100 { background: #2c3e50; }
-
-#clear-bet { 
-    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.4); color: white; 
-    border-radius: 20px; padding: 5px 15px; cursor: pointer; font-size: 11px; 
-    display: block; margin: 8px auto; transition: 0.3s;
+/* --- HUD (INTERFACE FLUTUANTE) --- */
+.ui-layer {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 100;
+    pointer-events: none; /* Deixa clicar no 3D se precisar */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
 }
-#clear-bet:hover { background: #c0392b; border-color: white; }
-
-.action-btn { padding: 10px 25px; font-size: 0.9rem; margin: 5px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; transition: 0.3s; }
-#reset-button.primary { background: var(--dourado); color: #222; padding: 12px 40px; font-size: 1.1rem; }
-.action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* --- 6. TELAS DE LOGIN E RESULTADOS --- */
-.modal-overlay, .result-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; justify-content: center; align-items: center; }
-.result-overlay { background: rgba(0,0,0,0.85); display: none; } 
-
-.modal-content { background: white; color: #222; padding: 35px; border-radius: 15px; width: 300px; text-align: center; box-shadow: 0 0 20px rgba(255,215,0,0.2); }
-.result-content { background: transparent; text-align: center; color: white; }
-
-.victory-title { color: var(--dourado); font-size: 4rem; text-shadow: 0 0 20px rgba(255, 215, 0, 0.7); margin-bottom: 10px; }
-.defeat-title { color: #ff4d4d; font-size: 3.5rem; text-shadow: 0 0 20px rgba(255, 77, 77, 0.5); margin-bottom: 10px; }
-.tie-title { color: #ffffff; font-size: 3.5rem; text-shadow: 0 0 15px rgba(255, 255, 255, 0.5); margin-bottom: 10px; }
-
-/* --- LINK DE CADASTRO CORRIGIDO --- */
-.toggle-link { 
-    font-size: 14px; margin-top: 15px; color: #2980b9; 
-    cursor: pointer; text-decoration: underline; transition: 0.3s;
-    display: inline-block;
+/* Reabilita cliques nos botões */
+.ui-layer button, .ui-layer .chip, .modal-glass, #user-header {
+    pointer-events: auto;
 }
-.toggle-link:hover { color: var(--verde-cassino); transform: scale(1.05); }
 
-.login-input { width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
-.btn-main-login { width: 100%; padding: 12px; background: var(--verde-cassino); color: white; border: none; font-weight: bold; cursor: pointer; border-radius: 6px; font-size: 1rem; }
+/* Header Minimalista */
+#user-header {
+    display: none; /* JS controla o display flex */
+    justify-content: space-between;
+    padding: 15px 30px;
+}
+.profile-pill {
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 50px;
+    padding: 5px 15px 5px 5px;
+    display: flex; align-items: center; gap: 10px;
+}
+.avatar { background: var(--gold); border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; }
+.user-details { display: flex; flex-direction: column; font-size: 0.8rem; }
+.status-online { font-size: 0.6rem; color: var(--neon-green); }
 
-/* --- EXTRAS --- */
+/* Botões do Topo */
+.btn-gold-grad {
+    background: linear-gradient(45deg, #daa520, #ffd700);
+    border: none; padding: 8px 15px; border-radius: 20px;
+    font-weight: bold; cursor: pointer; color: black;
+}
+
+/* Barra Inferior (Importante) */
+.bottom-bar {
+    background: linear-gradient(to top, #000 0%, rgba(0,0,0,0.8) 70%, transparent 100%);
+    padding: 20px 40px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+}
+
+/* Painel Financeiro */
+.financial-panel {
+    display: flex; gap: 20px;
+}
+.finance-item { display: flex; flex-direction: column; }
+.lbl { font-size: 0.7rem; color: #aaa; letter-spacing: 1px; }
+.val { font-size: 1.2rem; font-weight: bold; color: var(--gold); }
+
+/* Área das Fichas */
+.chips-container { display: flex; gap: 15px; justify-content: center; align-items: center; }
+.chip {
+    width: 60px; height: 60px;
+    border-radius: 50%;
+    border: 4px dashed rgba(255,255,255,0.8);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; text-shadow: 1px 1px 2px black;
+    cursor: pointer; transition: 0.2s;
+    box-shadow: 0 5px 10px rgba(0,0,0,0.5);
+    position: relative;
+}
+.chip:hover { transform: translateY(-10px); }
+.chip::before { /* Brilho */
+    content: ''; position: absolute; top:0; left:0; right:0; bottom:0;
+    border-radius: 50%; border: 2px solid rgba(0,0,0,0.2);
+}
+.chip-10 { background: #e74c3c; color: white; }
+.chip-50 { background: #3498db; color: white; }
+.chip-100 { background: #2c3e50; color: white; }
+
+/* Controles de Ação (Hit/Stand) */
+.action-panel { display: flex; justify-content: flex-end; }
+.in-game-buttons { display: flex; gap: 10px; }
+
+.btn-big.deal {
+    background: var(--neon-green);
+    color: black;
+    border: none;
+    font-size: 1.1rem; font-weight: bold;
+    padding: 15px 40px;
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+}
+
+.btn-action {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white; padding: 12px 30px;
+    border-radius: 30px; cursor: pointer;
+    font-weight: bold; display: flex; align-items: center; gap: 10px;
+    transition: 0.2s;
+}
+.btn-action.hit { background: var(--neon-green); color: black; border: none; }
+.btn-action.stand { background: #e74c3c; border: none; }
+.btn-action:disabled { opacity: 0.5; filter: grayscale(1); cursor: not-allowed; }
+
+.hidden { display: none !important; }
+
+/* --- MODAIS DE VIDRO --- */
+.modal-glass {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8);
+    backdrop-filter: blur(5px);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 1000;
+}
+.glass-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 40px;
+    border-radius: 20px;
+    width: 320px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.input-glass {
+    width: 100%; padding: 10px; margin: 10px 0;
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2);
+    color: white; border-radius: 5px;
+}
+.btn-neon {
+    width: 100%; padding: 12px;
+    background: var(--gold); color: black; border: none;
+    font-weight: bold; margin-top: 10px; cursor: pointer;
+    border-radius: 5px;
+}
+
+/* OVERLAYS DE VITÓRIA */
+.game-message {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    display: none;
+    flex-direction: column; justify-content: center; align-items: center;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(2px);
+    z-index: 200; pointer-events: auto;
+}
+.game-message h1 {
+    font-size: 4rem; margin-bottom: 20px;
+    text-shadow: 0 0 30px currentColor;
+}
+.game-message button { padding: 15px 40px; font-size: 1.2rem; cursor: pointer; border-radius: 50px; border:none;}
+
+.win h1 { color: var(--gold); }
+.win button { background: var(--gold); }
+.lose h1 { color: #ff4757; }
+.tie h1 { color: white; }
+
+/* Utilitário do Script */
 .escondido { display: none !important; }
-
-.cards-display:empty::before {
-    content: "Aguardando Apostas"; font-size: 12px; opacity: 0.3; border: 1px dashed rgba(255,255,255,0.2);
-    width: 75px; height: 110px; display: flex; align-items: center; justify-content: center; border-radius: 8px;
-}
