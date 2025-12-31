@@ -4,85 +4,81 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Blackjack Premium 3D</title>
+    <!-- Confetti e MercadoPago -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://sdk.mercadopago.com/js/v2"></script>
+    <!-- Fonte -->
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- LAYER 3D: Apenas a mesa e objetos -->
+    <!-- MUNDO 3D (A Mesa) -->
     <div class="scene">
         <div class="table-container">
             <div class="table-surface">
-                <!-- Baralho (Sabot) -->
+                <!-- Baralho (Visual) -->
                 <div id="deck-visual" class="shoe-3d">
-                    <div class="shoe-lid"></div>
                     <div class="shoe-front"></div>
                 </div>
 
-                <!-- Dealer -->
+                <!-- Dealer (Cartas em Cima) -->
                 <div class="dealer-zone">
                     <div class="zone-label">DEALER</div>
                     <div id="dealer-cards" class="cards-row"></div>
                     <div id="dealer-score-box" class="score-display">0</div>
                 </div>
 
-                <!-- TEXTO DA MESA (Agora no meio exato e legível) -->
+                <!-- Texto Central da Mesa -->
                 <div class="table-center-text">
                     <h2>BLACKJACK</h2>
                     <h3>PAYS 3 TO 2</h3>
                     <p>Dealer must stand on 17</p>
                 </div>
 
-                <!-- Jogador -->
+                <!-- Jogador (Cartas Embaixo) -->
                 <div class="player-zone active-spot">
                     <div class="spot-glow"></div>
                     <div class="zone-border"></div>
-                    <div id="player-cards" class="cards-row"></div>
-                    <!-- Score flutuante anexado ao player -->
+                    <!-- Score do Jogador -->
                     <div class="player-hud">
                         <span id="player-score" class="score-bubble">0</span>
                     </div>
+                    <!-- Cartas -->
+                    <div id="player-cards" class="cards-row"></div>
                     <div class="zone-label player-label">VOCÊ</div>
                 </div>
             </div>
             
-            <!-- Borda Grossa da Mesa -->
             <div class="table-edge"></div>
         </div>
     </div>
 
-    <!-- LAYER UI (2D): Controles, Menus e Botões -->
+    <!-- INTERFACE 2D (Botões e Menus) -->
     <div class="ui-layer">
         
-        <!-- Header -->
+        <!-- Topo -->
         <header id="user-header">
             <div class="user-profile">
                 <div class="avatar-circle">👤</div>
                 <div class="user-text">
-                    <span id="display-user-name">Convidado</span>
+                    <span id="display-user-name">Jogador</span>
                     <span class="status-indicator">● Online</span>
                 </div>
             </div>
-
             <div class="top-buttons">
-                <button id="btn-deposit" onclick="abrirModalDeposito()" class="btn-deposit">
-                    + SALDO
-                </button>
-                <button id="logout-button" onclick="logout()" class="btn-exit">
-                    Sair <span>✖</span>
-                </button>
+                <button id="btn-deposit" onclick="abrirModalDeposito()" class="btn-deposit">+ R$</button>
+                <button id="logout-button" onclick="logout()" class="btn-exit">SAIR ✖</button>
             </div>
         </header>
 
-        <!-- Barra Inferior de Jogo -->
+        <!-- Controles Inferiores -->
         <div class="bottom-controls">
-            <!-- Infos Financeiras -->
+            <!-- Saldo -->
             <div class="money-panel">
                 <div class="money-item">
                     <label>SALDO</label>
-                    <span class="value">R$ <span id="balance">0</span></span>
+                    <span class="value">R$ <span id="balance">0.00</span></span>
                 </div>
                 <div class="money-item">
                     <label>APOSTA</label>
@@ -90,7 +86,7 @@
                 </div>
             </div>
 
-            <!-- Fichas (Ficam escondidas durante jogo via JS 'escondido') -->
+            <!-- Botões de Aposta -->
             <div id="chips-area" class="chips-selector">
                 <button class="chip chip-10" onclick="apostar(10)">10</button>
                 <button class="chip chip-50" onclick="apostar(50)">50</button>
@@ -98,47 +94,48 @@
                 <button id="clear-bet" onclick="limparAposta()" class="btn-clear">✖</button>
             </div>
 
-            <!-- Botão Gigante de Dar Cartas -->
+            <!-- Botão Gigante de Jogar (Aqui estava o erro!) -->
             <div class="action-area-start">
-                <button id="reset-button" class="btn-deal">DISTRIBUIR CARTAS</button>
+                <button id="reset-button" class="btn-deal" onclick="iniciarRodadaComAposta()">DISTRIBUIR CARTAS</button>
             </div>
 
-            <!-- Ações IN-GAME (Hit/Stand) - O JS remove a classe 'escondido' para mostrar -->
+            <!-- Ações do Jogo (Aparecem depois de distribuir) -->
             <div class="in-game-actions">
-                <button id="hit-button" class="btn-action btn-hit escondido">PEDIR CARTAS</button>
-                <button id="stand-button" class="btn-action btn-stand escondido">MANTER (STOP)</button>
+                <button id="hit-button" class="btn-action btn-hit escondido">PEDIR +</button>
+                <button id="stand-button" class="btn-action btn-stand escondido">PARAR ✋</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAIS E OVERLAYS -->
-    
+    <!-- JANELAS E MODAIS -->
+
     <!-- Login -->
     <div id="login-screen" class="modal-overlay">
         <div class="modal-card">
-            <h2>Bem-vindo</h2>
+            <h2>BLACKJACK</h2>
+            <p>Entre para jogar</p>
             <input type="text" id="user-name" placeholder="Nome" class="input-dark" style="display:none;">
-            <input type="email" id="user-email" placeholder="Email" class="input-dark">
+            <input type="email" id="user-email" placeholder="E-mail" class="input-dark">
             <input type="password" id="user-pass" placeholder="Senha" class="input-dark">
             <button onclick="fazerLogin()" id="btn-login" class="btn-neon-green">ENTRAR</button>
-            <p id="toggle-text" onclick="toggleLogin()">Criar conta</p>
+            <p id="toggle-text" onclick="toggleLogin()">Não tem conta? Crie uma</p>
         </div>
     </div>
 
-    <!-- Pix / Deposito -->
+    <!-- PIX -->
     <div id="pix-modal" class="modal-overlay escondido">
         <div class="modal-card wide">
-            <h3>Adicionar Fichas</h3>
+            <h3>Depositar</h3>
             <div id="deposit-options">
                 <input type="number" id="pix-valor" placeholder="Valor (R$)" class="input-dark">
                 <div class="row-btns">
                     <button onclick="gerarFormularioCartao()" class="btn-outline">Cartão</button>
-                    <button onclick="solicitarPix()" class="btn-neon-green">PIX</button>
+                    <button onclick="solicitarPix()" class="btn-neon-green">Gerar PIX</button>
                 </div>
             </div>
             <div id="cardPaymentBrick_container"></div>
             <div id="pix-resultado" style="display:none;">
-                <p>Pagamento Seguro</p>
+                <p>Pagamento Gerado!</p>
                 <img id="pix-img" class="qr-img">
                 <textarea id="pix-copia-cola"></textarea>
             </div>
@@ -146,18 +143,18 @@
         </div>
     </div>
 
-    <!-- Mensagens de Resultado -->
+    <!-- Resultados -->
     <div id="victory-overlay" class="msg-overlay win-bg escondido">
-        <h1>VOCÊ GANHOU!</h1>
-        <button onclick="fecharCelebracao()">Continuar</button>
+        <h1>VOCÊ VENCEU!</h1>
+        <button onclick="fecharCelebracao()">Próxima Rodada</button>
     </div>
     <div id="defeat-overlay" class="msg-overlay lose-bg escondido">
-        <h1>A BANCA VENCEU</h1>
+        <h1>BANCA VENCEU</h1>
         <button onclick="fecharDerrota()">Tentar Novamente</button>
     </div>
     <div id="tie-overlay" class="msg-overlay tie-bg escondido">
         <h1>EMPATE</h1>
-        <button onclick="fecharTie()">Voltar</button>
+        <button onclick="fecharTie()">Retornar Aposta</button>
     </div>
 
     <script src="script.js"></script>
